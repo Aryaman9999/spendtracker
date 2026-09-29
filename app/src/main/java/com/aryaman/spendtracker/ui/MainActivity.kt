@@ -113,13 +113,15 @@ class MainActivity : ComponentActivity() {
                                 PeriodWindow(start, end, label, isCurrent)
                             }
                             PeriodType.WEEK -> {
-                                cal.firstDayOfWeek = Calendar.MONDAY
-                                cal.add(Calendar.WEEK_OF_YEAR, periodOffset)
-                                cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
                                 cal.set(Calendar.HOUR_OF_DAY, 0)
                                 cal.set(Calendar.MINUTE, 0)
                                 cal.set(Calendar.SECOND, 0)
                                 cal.set(Calendar.MILLISECOND, 0)
+
+                                val currentDow = cal.get(Calendar.DAY_OF_WEEK)
+                                val daysFromMonday = (currentDow - Calendar.MONDAY + 7) % 7
+                                cal.add(Calendar.DAY_OF_YEAR, -daysFromMonday + (periodOffset * 7))
+
                                 val start = cal.timeInMillis
                                 cal.add(Calendar.DAY_OF_YEAR, 7)
                                 val end = cal.timeInMillis - 1

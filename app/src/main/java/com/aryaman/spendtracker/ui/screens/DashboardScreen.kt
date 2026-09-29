@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,14 +69,12 @@ fun DashboardScreen(
     val totalOwedByRoommates = roommateBalances.sumOf { it.totalUnsettled }
 
     // Prepare chart bars based on periodType
-    val (chartBars, dailyAverage, highestSpendItem) = remember(transactions, periodType, totalSpend) {
-        val cal = Calendar.getInstance()
-        val currentDay = cal.get(Calendar.DAY_OF_MONTH)
+    val (chartBars, dailyAverage, highestSpendItem) = remember(transactions, periodType, totalSpend, isCurrentPeriod) {
         val debitTxns = transactions.filter { it.direction == TransactionDirection.DEBIT }
 
         when (periodType) {
             PeriodType.DAY -> {
-                // 6 time blocks for the day (Morning, Midday, Afternoon, Evening, Night, Late Night)
+                // 5 time blocks for the day (Morning, Midday, Afternoon, Evening, Night)
                 val blocks = listOf(
                     "6AM" to (6..9),
                     "10AM" to (10..13),
@@ -82,10 +82,11 @@ fun DashboardScreen(
                     "6PM" to (18..21),
                     "10PM" to (22..24)
                 )
+                val calBlock = Calendar.getInstance()
                 val bars = blocks.map { (label, hourRange) ->
                     val sum = debitTxns.filter {
-                        cal.timeInMillis = it.timestampMillis
-                        cal.get(Calendar.HOUR_OF_DAY) in hourRange
+                        calBlock.timeInMillis = it.timestampMillis
+                        calBlock.get(Calendar.HOUR_OF_DAY) in hourRange
                     }.sumOf { it.myActualShare }
                     BarChartItem(label, sum, isHighlighted = false)
                 }
@@ -101,14 +102,19 @@ fun DashboardScreen(
                     Calendar.MONDAY, Calendar.TUESDAY, Calendar.WEDNESDAY,
                     Calendar.THURSDAY, Calendar.FRIDAY, Calendar.SATURDAY, Calendar.SUNDAY
                 )
-                val todayDow = cal.get(Calendar.DAY_OF_WEEK)
+                val realTodayDow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
+                val calDay = Calendar.getInstance()
                 val bars = dayNames.mapIndexed { idx, name ->
                     val dow = dayConstants[idx]
                     val sum = debitTxns.filter {
-                        cal.timeInMillis = it.timestampMillis
-                        cal.get(Calendar.DAY_OF_WEEK) == dow
+                        calDay.timeInMillis = it.timestampMillis
+                        calDay.get(Calendar.DAY_OF_WEEK) == dow
                     }.sumOf { it.myActualShare }
-                    BarChartItem(name, sum, isHighlighted = (dow == todayDow))
+                    BarChartItem(
+                        label = name,
+                        amount = sum,
+                        isHighlighted = (isCurrentPeriod && dow == realTodayDow)
+                    )
                 }
                 val avg = totalSpend / 7.0
                 val highest = bars.maxByOrNull { it.amount }?.let {
@@ -117,29 +123,31 @@ fun DashboardScreen(
                 Triple(bars, avg, highest)
             }
             PeriodType.MONTH -> {
-                // Days of the month: up to 30 days
+                val realToday = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+                val cal = Calendar.getInstance()
                 val totalDaysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                val calDay = Calendar.getInstance()
                 val daySums = (1..totalDaysInMonth).map { day ->
                     val sum = debitTxns.filter {
-                        cal.timeInMillis = it.timestampMillis
-                        cal.get(Calendar.DAY_OF_MONTH) == day
+                        calDay.timeInMillis = it.timestampMillis
+                        calDay.get(Calendar.DAY_OF_MONTH) == day
                     }.sumOf { it.myActualShare }
                     BarChartItem(
-                        label = if (day == 1 || day == 5 || day == 10 || day == 15 || day == 20 || day == 25 || day == currentDay) {
-                            if (day == currentDay) "Today" else day.toString()
+                        label = if (day == 1 || day == 5 || day == 10 || day == 15 || day == 20 || day == 25 || (isCurrentPeriod && day == realToday)) {
+                            if (isCurrentPeriod && day == realToday) "Today" else day.toString()
                         } else "",
                         amount = sum,
-                        isHighlighted = (day == currentDay)
+                        isHighlighted = (isCurrentPeriod && day == realToday)
                     )
                 }
-                val daysElapsed = currentDay.coerceAtLeast(1)
+                val daysElapsed = if (isCurrentPeriod) realToday.coerceAtLeast(1) else totalDaysInMonth
                 val avg = totalSpend / daysElapsed
                 val highestDayIndex = daySums.indices.maxByOrNull { daySums[it].amount } ?: -1
                 val highest = if (highestDayIndex >= 0 && daySums[highestDayIndex].amount > 0) {
                     val dayNum = highestDayIndex + 1
                     val topCatForDay = debitTxns.filter {
-                        cal.timeInMillis = it.timestampMillis
-                        cal.get(Calendar.DAY_OF_MONTH) == dayNum
+                        calDay.timeInMillis = it.timestampMillis
+                        calDay.get(Calendar.DAY_OF_MONTH) == dayNum
                     }.groupBy { it.category }.maxByOrNull { entry -> entry.value.sumOf { it.myActualShare } }?.key ?: "Spend"
                     Triple("$dayNum ${SimpleDateFormat("MMM", Locale.getDefault()).format(cal.time)}", daySums[highestDayIndex].amount, topCatForDay)
                 } else null
@@ -254,9 +262,40 @@ fun DashboardScreen(
 
                 Spacer(Modifier.height(8.dp))
 
-                // Date Navigator Row: ‹ Date Label ›
+                var dragDistanceX by remember { mutableFloatStateOf(0f) }
+                val timeSliderModifier = Modifier.pointerInput(periodType, periodLabel, canGoForward) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragDistanceX = 0f },
+                        onHorizontalDrag = { change, dragAmount ->
+                            dragDistanceX += dragAmount
+                            if (kotlin.math.abs(dragAmount) > 2f) {
+                                change.consume()
+                            }
+                        },
+                        onDragEnd = {
+                            val threshold = 35.dp.toPx()
+                            if (dragDistanceX > threshold) {
+                                // Swiped right -> go to previous period
+                                onPreviousPeriod()
+                            } else if (dragDistanceX < -threshold) {
+                                // Swiped left -> go to next period
+                                if (canGoForward) {
+                                    onNextPeriod()
+                                }
+                            }
+                            dragDistanceX = 0f
+                        },
+                        onDragCancel = {
+                            dragDistanceX = 0f
+                        }
+                    )
+                }
+
+                // Date Navigator Row: ‹ Date Label › with swipe support
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(timeSliderModifier),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -291,13 +330,42 @@ fun DashboardScreen(
             }
         }
 
-        // 3. Step Tracker Inspired Vertical Bar Chart Card
+        // 3. Step Tracker Inspired Vertical Bar Chart Card (Supports horizontal swipe left/right to shift periods)
         item {
+            var chartDragX by remember { mutableFloatStateOf(0f) }
+            val chartSwipeModifier = Modifier.pointerInput(periodType, periodLabel, canGoForward) {
+                detectHorizontalDragGestures(
+                    onDragStart = { chartDragX = 0f },
+                    onHorizontalDrag = { change, dragAmount ->
+                        chartDragX += dragAmount
+                        if (kotlin.math.abs(dragAmount) > 2f) {
+                            change.consume()
+                        }
+                    },
+                    onDragEnd = {
+                        val threshold = 35.dp.toPx()
+                        if (chartDragX > threshold) {
+                            onPreviousPeriod()
+                        } else if (chartDragX < -threshold) {
+                            if (canGoForward) {
+                                onNextPeriod()
+                            }
+                        }
+                        chartDragX = 0f
+                    },
+                    onDragCancel = {
+                        chartDragX = 0f
+                    }
+                )
+            }
+
             StepTrackerSpendChartCard(
                 chartBars = chartBars,
                 totalSpend = totalSpend,
                 dailyAverage = dailyAverage,
-                periodType = periodType
+                periodType = periodType,
+                isCurrentPeriod = isCurrentPeriod,
+                modifier = chartSwipeModifier
             )
         }
 
@@ -336,7 +404,7 @@ fun DashboardScreen(
                                 text = String.format(Locale.getDefault(), "₹%.2f", highestSpendItem.second),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = RoseDebit
+                                color = RoseDebitDark
                             )
                             Text(
                                 text = highestSpendItem.third,
@@ -450,14 +518,17 @@ fun StepTrackerSpendChartCard(
     chartBars: List<BarChartItem>,
     totalSpend: Double,
     dailyAverage: Double,
-    periodType: PeriodType
+    periodType: PeriodType,
+    isCurrentPeriod: Boolean = true,
+    modifier: Modifier = Modifier
 ) {
     val maxBarAmount = remember(chartBars) {
-        max(chartBars.maxOfOrNull { it.amount } ?: 0.0, 100.0)
+        val maxAmount = chartBars.maxOfOrNull { it.amount } ?: 0.0
+        if (maxAmount > 0.0) maxAmount else 100.0
     }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
@@ -481,7 +552,12 @@ fun StepTrackerSpendChartCard(
                     verticalAlignment = Alignment.Bottom
                 ) {
                     chartBars.forEach { item ->
-                        val ratio = (item.amount / maxBarAmount).toFloat().coerceIn(0.04f, 1f)
+                        val hasSpend = item.amount > 0.0
+                        val ratio = if (hasSpend && maxBarAmount > 0.0) {
+                            (item.amount / maxBarAmount).toFloat().coerceIn(0.08f, 1f)
+                        } else {
+                            0f
+                        }
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Bottom,
@@ -493,20 +569,21 @@ fun StepTrackerSpendChartCard(
                                     .width(if (periodType == PeriodType.MONTH) 6.dp else 22.dp)
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(3.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
                                 contentAlignment = Alignment.BottomCenter
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .fillMaxHeight(ratio)
-                                        .clip(RoundedCornerShape(3.dp))
-                                        .background(
-                                            if (item.isHighlighted) EmeraldSuccess
-                                            else if (item.amount > 0) PrimaryIndigo
-                                            else Color.Transparent
-                                        )
-                                )
+                                if (hasSpend && ratio > 0f) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .fillMaxHeight(ratio)
+                                            .clip(RoundedCornerShape(3.dp))
+                                            .background(
+                                                if (item.isHighlighted && isCurrentPeriod) EmeraldSuccess
+                                                else EmeraldSuccess.copy(alpha = 0.85f)
+                                            )
+                                    )
+                                }
                             }
                         }
                     }
@@ -524,8 +601,8 @@ fun StepTrackerSpendChartCard(
                             Text(
                                 text = item.label,
                                 fontSize = 9.sp,
-                                fontWeight = if (item.isHighlighted) FontWeight.Bold else FontWeight.Normal,
-                                color = if (item.isHighlighted) EmeraldSuccess else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                fontWeight = if (item.isHighlighted && isCurrentPeriod) FontWeight.ExtraBold else FontWeight.Normal,
+                                color = if (item.isHighlighted && isCurrentPeriod) EmeraldSuccess else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
                         } else {
                             Spacer(Modifier.width(1.dp))
@@ -926,7 +1003,7 @@ fun TransactionRowItem(transaction: TransactionEntity) {
                     text = (if (isDebit) "- " else "+ ") + String.format(Locale.getDefault(), "₹%.2f", transaction.myActualShare),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold,
-                    color = if (isDebit) RoseDebit else EmeraldSuccess
+                    color = if (isDebit) RoseDebitDark else EmeraldSuccess
                 )
                 if (isSplit) {
                     Text(

@@ -61,7 +61,7 @@ val CategoryTravel = Color(0xFF3B82F6)
 val CategoryPersonal = Color(0xFFA855F7)
 val CategoryShopping = Color(0xFFEC4899)
 val CategoryBills = Color(0xFFEAB308)
-val CategoryEntertainment = Color(0xFFF43F5E)
+val CategoryEntertainment = Color(0xFF8B5CF6)
 val CategoryHealth = Color(0xFF14B8A6)
 val CategoryOther = Color(0xFF6366F1)
 

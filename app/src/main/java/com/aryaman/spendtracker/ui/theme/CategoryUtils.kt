@@ -120,7 +120,12 @@ fun MerchantAvatar(
     size: Dp = 42.dp,
     modifier: Modifier = Modifier
 ) {
-    val color = if (isDebit) RoseDebit else EmeraldSuccess
+    // Use category-specific vibrant color if available; otherwise subtle indigo for debit, emerald for credit
+    val avatarColor = if (!category.isNullOrBlank() && category.lowercase(Locale.ROOT) != "uncategorized") {
+        getCategoryColor(category)
+    } else {
+        if (isDebit) Color(0xFF6366F1) else EmeraldSuccess
+    }
     val initial = merchantName?.trim()?.firstOrNull()?.uppercase() ?: "?"
     val cornerRadius = (size.value * 0.32f).dp
 
@@ -131,20 +136,20 @@ fun MerchantAvatar(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(cornerRadius))
-            .background(color.copy(alpha = 0.12f)),
+            .background(avatarColor.copy(alpha = 0.16f)),
         contentAlignment = Alignment.Center
     ) {
         if (catIcon != null && catIcon != Icons.Default.Category) {
             Icon(
                 imageVector = catIcon,
                 contentDescription = merchantName,
-                tint = color,
+                tint = avatarColor,
                 modifier = Modifier.size(size * 0.52f)
             )
         } else {
             Text(
                 text = initial,
-                color = color,
+                color = avatarColor,
                 fontWeight = FontWeight.Bold,
                 fontSize = (size.value * 0.42f).sp
             )

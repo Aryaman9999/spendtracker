@@ -354,7 +354,7 @@ fun TransactionDetailCard(
                         text = (if (isDebit) "- " else "+ ") + String.format(Locale.getDefault(), "₹%.2f", transaction.myActualShare),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = if (isDebit) RoseDebit else EmeraldSuccess
+                        color = if (isDebit) RoseDebitDark else EmeraldSuccess
                     )
                     if (isSplit) {
                         Text(
