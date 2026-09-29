@@ -41,6 +41,18 @@ enum class Screen {
     ADD_TEMPLATE
 }
 
+enum class PeriodType {
+    WEEK,
+    MONTH
+}
+
+data class PeriodWindow(
+    val startTime: Long,
+    val endTime: Long,
+    val label: String,
+    val isCurrent: Boolean
+)
+
 class MainActivity : ComponentActivity() {
 
     private val requestPermissionsLauncher = registerForActivityResult(
@@ -78,20 +90,54 @@ class MainActivity : ComponentActivity() {
                     val allSplits by repository.allSplits.collectAsState(initial = emptyList())
                     val templates by repository.allTemplates.collectAsState(initial = emptyList())
 
-                    // Calculate start and end timestamps for the current month
-                    val (startOfMonth, endOfMonth) = remember {
+                    // Time Period State (Week / Month view + Prev/Next navigation)
+                    var selectedPeriodType by remember { mutableStateOf(PeriodType.MONTH) }
+                    var periodOffset by remember { mutableIntStateOf(0) }
+
+                    val periodWindow = remember(selectedPeriodType, periodOffset) {
                         val cal = Calendar.getInstance()
-                        cal.set(Calendar.DAY_OF_MONTH, 1)
-                        cal.set(Calendar.HOUR_OF_DAY, 0)
-                        cal.set(Calendar.MINUTE, 0)
-                        cal.set(Calendar.SECOND, 0)
-                        val start = cal.timeInMillis
-                        cal.add(Calendar.MONTH, 1)
-                        val end = cal.timeInMillis - 1
-                        Pair(start, end)
+                        if (selectedPeriodType == PeriodType.MONTH) {
+                            cal.add(Calendar.MONTH, periodOffset)
+                            cal.set(Calendar.DAY_OF_MONTH, 1)
+                            cal.set(Calendar.HOUR_OF_DAY, 0)
+                            cal.set(Calendar.MINUTE, 0)
+                            cal.set(Calendar.SECOND, 0)
+                            cal.set(Calendar.MILLISECOND, 0)
+                            val start = cal.timeInMillis
+                            cal.add(Calendar.MONTH, 1)
+                            val end = cal.timeInMillis - 1
+
+                            cal.timeInMillis = start
+                            val label = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(cal.time)
+                            val isCurrent = (periodOffset == 0)
+                            PeriodWindow(start, end, label, isCurrent)
+                        } else {
+                            cal.firstDayOfWeek = Calendar.MONDAY
+                            cal.add(Calendar.WEEK_OF_YEAR, periodOffset)
+                            cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+                            cal.set(Calendar.HOUR_OF_DAY, 0)
+                            cal.set(Calendar.MINUTE, 0)
+                            cal.set(Calendar.SECOND, 0)
+                            cal.set(Calendar.MILLISECOND, 0)
+                            val start = cal.timeInMillis
+                            cal.add(Calendar.DAY_OF_YEAR, 7)
+                            val end = cal.timeInMillis - 1
+
+                            val startLabel = java.text.SimpleDateFormat("dd MMM", java.util.Locale.getDefault()).format(java.util.Date(start))
+                            val endLabel = java.text.SimpleDateFormat("dd MMM", java.util.Locale.getDefault()).format(java.util.Date(end))
+                            val label = "$startLabel - $endLabel"
+                            val isCurrent = (periodOffset == 0)
+                            PeriodWindow(start, end, label, isCurrent)
+                        }
                     }
 
-                    val categorySpends by repository.getSpendByCategory(startOfMonth, endOfMonth).collectAsState(initial = emptyList())
+                    val categorySpends by remember(periodWindow.startTime, periodWindow.endTime) {
+                        repository.getSpendByCategory(periodWindow.startTime, periodWindow.endTime)
+                    }.collectAsState(initial = emptyList())
+
+                    val periodTransactions = remember(transactions, periodWindow.startTime, periodWindow.endTime) {
+                        transactions.filter { it.timestampMillis in periodWindow.startTime..periodWindow.endTime }
+                    }
 
                     val scope = rememberCoroutineScope()
 
@@ -170,10 +216,21 @@ class MainActivity : ComponentActivity() {
                         Surface(modifier = Modifier.padding(padding)) {
                             when (currentScreen) {
                                 Screen.DASHBOARD -> DashboardScreen(
-                                    transactions = transactions,
+                                    transactions = periodTransactions,
                                     categorySpends = categorySpends,
                                     roommateBalances = roommateBalances,
                                     pendingCount = pendingTransactions.size,
+                                    periodType = selectedPeriodType,
+                                    periodLabel = periodWindow.label,
+                                    isCurrentPeriod = periodWindow.isCurrent,
+                                    canGoForward = periodOffset < 0,
+                                    onPeriodTypeChange = {
+                                        selectedPeriodType = it
+                                        periodOffset = 0
+                                    },
+                                    onPreviousPeriod = { periodOffset -= 1 },
+                                    onNextPeriod = { if (periodOffset < 0) periodOffset += 1 },
+                                    onResetToCurrentPeriod = { periodOffset = 0 },
                                     onNavigateToTransactions = { filterPending, catFilter ->
                                         filterPendingInTransactions = filterPending
                                         selectedCategoryFilter = catFilter

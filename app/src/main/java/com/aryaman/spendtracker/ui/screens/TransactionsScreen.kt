@@ -1,21 +1,26 @@
 package com.aryaman.spendtracker.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aryaman.spendtracker.data.local.entity.CategoryEntity
@@ -77,7 +82,13 @@ fun TransactionsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("All Transactions", fontWeight = FontWeight.Bold) }
+                title = {
+                    Text(
+                        "All Transactions",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             )
         }
     ) { padding ->
@@ -86,62 +97,53 @@ fun TransactionsScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Active Category Filter Banner
+            // Active Category Filter Banner (Compact Pill)
             if (selectedCategoryFilter != null) {
                 val catColor = getCategoryColor(selectedCategoryFilter)
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 6.dp),
-                    shape = MaterialTheme.shapes.small,
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = catColor.copy(alpha = 0.12f)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            CategoryAvatar(category = selectedCategoryFilter, size = 32.dp)
+                            CategoryAvatar(category = selectedCategoryFilter, size = 26.dp)
                             Spacer(Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "Filtered by Category",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = selectedCategoryFilter,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                        FilledTonalButton(
-                            onClick = onClearCategoryFilter,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.height(30.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                contentColor = MaterialTheme.colorScheme.onSurface
+                            Text(
+                                text = "Filtered: $selectedCategoryFilter",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
+                        }
+                        IconButton(
+                            onClick = onClearCategoryFilter,
+                            modifier = Modifier.size(28.dp)
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Clear", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Clear Filter",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
             }
 
-            // Filter Chips
+            // Sleek Filter Chips Row
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item {
@@ -149,10 +151,7 @@ fun TransactionsScreen(
                         selected = selectedFilter == TransactionFilter.ALL,
                         onClick = { selectedFilter = TransactionFilter.ALL },
                         label = { Text("All (${transactions.size})") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
+                        shape = RoundedCornerShape(10.dp)
                     )
                 }
                 item {
@@ -161,9 +160,10 @@ fun TransactionsScreen(
                         selected = selectedFilter == TransactionFilter.PENDING,
                         onClick = { selectedFilter = TransactionFilter.PENDING },
                         label = { Text("Pending ($pendingCount)") },
+                        shape = RoundedCornerShape(10.dp),
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer
+                            selectedContainerColor = AmberContainer,
+                            selectedLabelColor = AmberPending
                         )
                     )
                 }
@@ -172,10 +172,7 @@ fun TransactionsScreen(
                         selected = selectedFilter == TransactionFilter.AUTO_MATCHED,
                         onClick = { selectedFilter = TransactionFilter.AUTO_MATCHED },
                         label = { Text("Auto-Matched") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
+                        shape = RoundedCornerShape(10.dp)
                     )
                 }
                 item {
@@ -184,10 +181,7 @@ fun TransactionsScreen(
                         selected = selectedFilter == TransactionFilter.SPLIT,
                         onClick = { selectedFilter = TransactionFilter.SPLIT },
                         label = { Text("Splits ($splitCount)") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
+                        shape = RoundedCornerShape(10.dp)
                     )
                 }
             }
@@ -200,15 +194,23 @@ fun TransactionsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.ReceiptLong,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(Modifier.height(12.dp))
                         Text(
-                            text = "No transactions found in this filter.",
+                            text = "No transactions match this filter",
                             style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         if (selectedCategoryFilter != null) {
                             Spacer(Modifier.height(8.dp))
                             TextButton(onClick = onClearCategoryFilter) {
-                                Text("Clear Category Filter", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                                Text("Clear Category Filter", color = PrimaryIndigo, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -217,8 +219,9 @@ fun TransactionsScreen(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredList, key = { it.id }) { txn ->
                         TransactionDetailCard(
@@ -229,7 +232,6 @@ fun TransactionsScreen(
                             onDelete = { onDelete(txn.id) }
                         )
                     }
-                    item { Spacer(Modifier.height(24.dp)) }
                 }
             }
         }
@@ -262,6 +264,10 @@ fun TransactionsScreen(
     }
 }
 
+/**
+ * Compact, scannable transaction item that expands on tap.
+ * Eliminates wrapping bugs, bloated nested boxes, and cluttered buttons.
+ */
 @Composable
 fun TransactionDetailCard(
     transaction: TransactionEntity,
@@ -270,312 +276,196 @@ fun TransactionDetailCard(
     onOpenSplitDialog: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()) }
+    var isExpanded by remember { mutableStateOf(false) }
+    val dateFormat = remember { SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()) }
     val isDebit = transaction.direction == TransactionDirection.DEBIT
     val isSplit = transaction.myActualShare != transaction.amount || splits.isNotEmpty()
     val roommatesOwed = maxOf(0.0, transaction.amount - transaction.myActualShare)
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        elevation = CardDefaults.cardElevation(0.dp)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { isExpanded = !isExpanded },
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
-            // Header: Payee info on left, Personal Share on right
+            // Main Compact Scannable Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    MerchantAvatar(
-                        merchantName = transaction.cleanMerchant ?: "Unknown Payee",
-                        isDebit = isDebit,
-                        category = transaction.category,
-                        size = 42.dp
+                // Vector Squircle Icon
+                MerchantAvatar(
+                    merchantName = transaction.cleanMerchant ?: "Unknown Payee",
+                    isDebit = isDebit,
+                    category = transaction.category,
+                    size = 42.dp
+                )
+
+                Spacer(Modifier.width(12.dp))
+
+                // Payee & Date (Ellipsized to NEVER wrap onto multi-line mess)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = transaction.cleanMerchant ?: "Unknown Payee",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = transaction.cleanMerchant ?: "Unknown Payee",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = dateFormat.format(Date(transaction.timestampMillis)),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "${transaction.category ?: "Uncategorized"} • ${dateFormat.format(Date(transaction.timestampMillis))}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
+                Spacer(Modifier.width(8.dp))
+
+                // Amount & Split Badge
                 Column(horizontalAlignment = Alignment.End) {
                     if (isSplit) {
                         Surface(
-                            shape = MaterialTheme.shapes.extraSmall,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(4.dp),
+                            color = PrimaryIndigo.copy(alpha = 0.15f),
                             modifier = Modifier.padding(bottom = 2.dp)
                         ) {
                             Text(
-                                text = "Split",
+                                text = "✂️ Split",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                color = PrimaryIndigoDark,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }
                     }
                     Text(
                         text = (if (isDebit) "- " else "+ ") + String.format(Locale.getDefault(), "₹%.2f", transaction.myActualShare),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
                         color = if (isDebit) RoseDebit else EmeraldSuccess
                     )
                     if (isSplit) {
                         Text(
-                            text = "Your Share (Bill: ₹${String.format(Locale.getDefault(), "%.2f", transaction.amount)})",
+                            text = "Bill ₹${String.format(Locale.getDefault(), "%.0f", transaction.amount)}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 10.sp
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            // Expandable Details (Smoothly revealed ONLY when user taps!)
+            AnimatedVisibility(visible = isExpanded) {
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                    Spacer(Modifier.height(10.dp))
 
-            // Details row: Account + Ref + Status Badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = listOfNotNull(
-                        transaction.accountInfo,
-                        transaction.referenceNumber?.let { "Ref: $it" }
-                    ).joinToString(" • "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Surface(
-                    shape = MaterialTheme.shapes.extraSmall,
-                    color = when (transaction.status) {
-                        TransactionStatus.AUTO_MATCHED -> EmeraldSuccess.copy(alpha = 0.08f)
-                        TransactionStatus.PENDING_REVIEW -> AmberPending.copy(alpha = 0.08f)
-                        TransactionStatus.MANUALLY_SET -> PrimaryIndigo.copy(alpha = 0.08f)
-                    }
-                ) {
-                    Text(
-                        text = when (transaction.status) {
-                            TransactionStatus.AUTO_MATCHED -> "Auto-Matched"
-                            TransactionStatus.PENDING_REVIEW -> "Pending"
-                            TransactionStatus.MANUALLY_SET -> "Manual"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = when (transaction.status) {
-                            TransactionStatus.AUTO_MATCHED -> EmeraldSuccess
-                            TransactionStatus.PENDING_REVIEW -> AmberPending
-                            TransactionStatus.MANUALLY_SET -> PrimaryIndigo
-                        },
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            // Dedicated Split Breakdown Box when this expense is split
-            if (isSplit) {
-                Spacer(Modifier.height(16.dp))
-                val yourRatio = if (transaction.amount > 0) (transaction.myActualShare / transaction.amount).toFloat().coerceIn(0f, 1f) else 1f
-                val othersRatio = 1f - yourRatio
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.small,
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                    elevation = CardDefaults.cardElevation(0.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp)
+                    // Account, Reference & Status
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Header of split breakdown box
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.CallSplit,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text = "Split Breakdown",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                        Text(
+                            text = listOfNotNull(
+                                transaction.accountInfo,
+                                transaction.referenceNumber?.let { "Ref: $it" }
+                            ).joinToString(" • ").ifEmpty { "Manual Entry" },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = when (transaction.status) {
+                                TransactionStatus.AUTO_MATCHED -> EmeraldSuccess.copy(alpha = 0.12f)
+                                TransactionStatus.PENDING_REVIEW -> AmberPending.copy(alpha = 0.12f)
+                                TransactionStatus.MANUALLY_SET -> PrimaryIndigo.copy(alpha = 0.12f)
                             }
-                            if (roommatesOwed > 0) {
-                                Surface(
-                                    shape = MaterialTheme.shapes.extraSmall,
-                                    color = EmeraldSuccess.copy(alpha = 0.08f)
+                        ) {
+                            Text(
+                                text = when (transaction.status) {
+                                    TransactionStatus.AUTO_MATCHED -> "Auto-Matched"
+                                    TransactionStatus.PENDING_REVIEW -> "Pending Review"
+                                    TransactionStatus.MANUALLY_SET -> "Manual"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = when (transaction.status) {
+                                    TransactionStatus.AUTO_MATCHED -> EmeraldSuccess
+                                    TransactionStatus.PENDING_REVIEW -> AmberPending
+                                    TransactionStatus.MANUALLY_SET -> PrimaryIndigoDark
+                                },
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    // Compact Split Breakdown if split
+                    if (isSplit) {
+                        Spacer(Modifier.height(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = "To Collect: ₹${String.format(Locale.getDefault(), "%.2f", roommatesOwed)}",
+                                        text = "Split Summary",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = EmeraldSuccess,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        fontWeight = FontWeight.Bold,
+                                        color = PrimaryIndigoDark
                                     )
-                                }
-                            }
-                        }
-
-                        Spacer(Modifier.height(12.dp))
-
-                        // 3 Key Metrics: Total Bill, You Paid, Roommates Portion
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Total Bill", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    String.format(Locale.getDefault(), "₹%.2f", transaction.amount),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    "You Paid (${(yourRatio * 100).toInt()}%)",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    String.format(Locale.getDefault(), "₹%.2f", transaction.myActualShare),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                                Text(
-                                    "Roommates (${(othersRatio * 100).toInt()}%)",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = EmeraldSuccess
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    String.format(Locale.getDefault(), "₹%.2f", roommatesOwed),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = EmeraldSuccess
-                                )
-                            }
-                        }
-
-                        Spacer(Modifier.height(12.dp))
-
-                        // Visual proportion bar
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(MaterialTheme.shapes.extraSmall)
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            if (yourRatio > 0f) {
-                                Box(
-                                    modifier = Modifier
-                                        .weight(maxOf(0.01f, yourRatio))
-                                        .fillMaxHeight()
-                                        .background(MaterialTheme.colorScheme.primary)
-                                )
-                            }
-                            if (othersRatio > 0f) {
-                                Box(
-                                    modifier = Modifier
-                                        .weight(maxOf(0.01f, othersRatio))
-                                        .fillMaxHeight()
-                                        .background(EmeraldSuccess)
-                                )
-                            }
-                        }
-
-                        // Roommates breakdown if present
-                        if (splits.isNotEmpty()) {
-                            Spacer(Modifier.height(12.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            Spacer(Modifier.height(12.dp))
-
-                            splits.forEach { split ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Surface(
-                                            shape = MaterialTheme.shapes.extraSmall,
-                                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                            modifier = Modifier.size(24.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = split.roommateName.firstOrNull()?.uppercase() ?: "?",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                        Spacer(Modifier.width(8.dp))
+                                    if (roommatesOwed > 0) {
                                         Text(
-                                            split.roommateName,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            text = "Owed to you: ₹${String.format(Locale.getDefault(), "%.2f", roommatesOwed)}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = EmeraldSuccess
                                         )
                                     }
+                                }
 
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            String.format(Locale.getDefault(), "₹%.2f", split.amountOwed),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(Modifier.width(12.dp))
-                                        Surface(
-                                            shape = MaterialTheme.shapes.extraSmall,
-                                            color = if (split.settled) EmeraldSuccess.copy(alpha = 0.08f) else AmberPending.copy(alpha = 0.08f)
+                                if (splits.isNotEmpty()) {
+                                    Spacer(Modifier.height(6.dp))
+                                    splits.forEach { split ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 2.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = if (split.settled) "Settled" else "Unsettled",
-                                                style = MaterialTheme.typography.labelSmall,
+                                                text = "• ${split.roommateName}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = "₹${String.format(Locale.getDefault(), "%.2f", split.amountOwed)} (${if (split.settled) "Settled" else "Unsettled"})",
+                                                style = MaterialTheme.typography.bodySmall,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = if (split.settled) EmeraldSuccess else AmberPending,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                color = if (split.settled) EmeraldSuccess else AmberPending
                                             )
                                         }
                                     }
@@ -583,77 +473,54 @@ fun TransactionDetailCard(
                             }
                         }
                     }
-                }
-            }
 
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(10.dp))
 
-            // Action row: Category chip, Split button, and Delete
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AssistChip(
-                    onClick = onOpenCategoryPicker,
-                    label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (transaction.category != null) {
-                                CategoryAvatar(category = transaction.category, size = 20.dp)
-                                Spacer(Modifier.width(8.dp))
+                    // Actions: Category Chip, Split Button, Delete
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AssistChip(
+                            onClick = onOpenCategoryPicker,
+                            label = {
                                 Text(
-                                    text = transaction.category,
+                                    text = transaction.category ?: "Tap to Categorize",
+                                    style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold
                                 )
-                            } else {
-                                Text(
-                                    text = "Tap to Categorize",
-                                    fontWeight = FontWeight.SemiBold
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp))
+                            },
+                            shape = RoundedCornerShape(8.dp)
+                        )
+
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilledTonalButton(
+                                onClick = onOpenSplitDialog,
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.CallSplit, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Split", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            IconButton(
+                                onClick = onDelete,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete",
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
-                    },
-                    leadingIcon = {
-                        if (transaction.category == null) {
-                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                        }
-                    },
-                    colors = AssistChipDefaults.assistChipColors(
-                        containerColor = if (transaction.category == null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
-                        labelColor = if (transaction.category == null) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
-                        leadingIconContentColor = if (transaction.category == null) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    border = null,
-                    shape = MaterialTheme.shapes.small
-                )
-
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalIconButton(
-                        onClick = onOpenSplitDialog,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = if (isSplit) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
-                            contentColor = if (isSplit) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.CallSplit,
-                            contentDescription = "Split Expense",
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = onDelete,
-                        colors = IconButtonDefaults.iconButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            modifier = Modifier.size(20.dp)
-                        )
                     }
                 }
             }

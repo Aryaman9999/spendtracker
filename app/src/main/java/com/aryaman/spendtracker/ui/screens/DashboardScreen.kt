@@ -1,8 +1,5 @@
 package com.aryaman.spendtracker.ui.screens
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,7 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Notifications
@@ -34,271 +31,379 @@ import com.aryaman.spendtracker.data.local.dao.CategorySpendSummary
 import com.aryaman.spendtracker.data.local.dao.RoommateBalance
 import com.aryaman.spendtracker.data.local.entity.TransactionEntity
 import com.aryaman.spendtracker.data.model.TransactionDirection
+import com.aryaman.spendtracker.ui.PeriodType
 import com.aryaman.spendtracker.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     transactions: List<TransactionEntity>,
     categorySpends: List<CategorySpendSummary>,
     roommateBalances: List<RoommateBalance>,
     pendingCount: Int,
+    periodType: PeriodType,
+    periodLabel: String,
+    isCurrentPeriod: Boolean,
+    canGoForward: Boolean,
+    onPeriodTypeChange: (PeriodType) -> Unit,
+    onPreviousPeriod: () -> Unit,
+    onNextPeriod: () -> Unit,
+    onResetToCurrentPeriod: () -> Unit,
     onNavigateToTransactions: (filterPending: Boolean, categoryFilter: String?) -> Unit,
     onNavigateToSplits: () -> Unit
 ) {
     val totalSpend = categorySpends.sumOf { it.totalAmount }
     val totalOwedByRoommates = roommateBalances.sumOf { it.totalUnsettled }
 
-    // Date & pace calculations
-    val (monthName, dayOfMonth, totalDaysInMonth) = remember {
-        val cal = Calendar.getInstance()
-        val mName = SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(cal.time)
-        val day = cal.get(Calendar.DAY_OF_MONTH)
-        val maxDays = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
-        Triple(mName, day, maxDays)
-    }
-
-    val dailyAverage = if (dayOfMonth > 0) totalSpend / dayOfMonth else 0.0
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(PrimaryIndigo, Color(0xFF6366F1))
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "₹",
-                                color = Color.White,
-                                fontWeight = FontWeight.Black,
-                                fontSize = 18.sp
-                            )
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Row {
-                            Text(
-                                "Spend",
-                                fontWeight = FontWeight.Black,
-                                fontSize = 20.sp,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                "Tracker",
-                                fontWeight = FontWeight.Normal,
-                                fontSize = 20.sp,
-                                color = PrimaryIndigoDark
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    if (pendingCount > 0) {
-                        IconButton(onClick = { onNavigateToTransactions(true, null) }) {
-                            BadgedBox(
-                                badge = {
-                                    Badge(
-                                        containerColor = AmberPending,
-                                        contentColor = Color.White
-                                    ) { Text(pendingCount.toString()) }
-                                }
-                            ) {
-                                Icon(
-                                    Icons.Default.Notifications,
-                                    contentDescription = "Pending Review",
-                                    tint = AmberPending
-                                )
-                            }
-                        }
-                    }
-                }
-            )
+    // Daily pace calculation
+    val divisorDays = remember(periodType) {
+        if (periodType == PeriodType.WEEK) 7
+        else {
+            val cal = Calendar.getInstance()
+            cal.get(Calendar.DAY_OF_MONTH).coerceAtLeast(1)
         }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Pending Review Banner (if any uncategorized spends)
-            if (pendingCount > 0) {
-                item {
-                    Surface(
-                        color = AmberContainer.copy(alpha = 0.85f),
-                        shape = RoundedCornerShape(16.dp),
+    }
+    val dailyAverage = if (divisorDays > 0) totalSpend / divisorDays else 0.0
+
+    // No giant TopAppBar - everything is seamlessly placed inside LazyColumn with natural padding
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // 1. Sleek, Low-Profile Brand Header (Replaces bulky TopAppBar)
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigateToTransactions(true, null) }
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(PrimaryIndigo, Color(0xFF6366F1))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "$pendingCount Uncategorized Spend${if (pendingCount > 1) "s" else ""}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = AmberPending
-                                )
-                                Text(
-                                    text = "Tap to categorize & teach rules",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Button(
-                                onClick = { onNavigateToTransactions(true, null) },
-                                colors = ButtonDefaults.buttonColors(containerColor = AmberPending),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text("Review", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Hero Spend Card - Modern Fintech Architecture
-            item {
-                HeroSpendCard(
-                    monthName = monthName,
-                    totalSpend = totalSpend,
-                    dailyAverage = dailyAverage,
-                    transactionCount = transactions.size,
-                    totalOwedByRoommates = totalOwedByRoommates,
-                    onNavigateToSplits = onNavigateToSplits
-                )
-            }
-
-            // Quick Stats Row (Roommates Owed + Daily Pace)
-            if (totalOwedByRoommates > 0) {
-                item {
-                    RoommateOwedQuickCard(
-                        totalOwed = totalOwedByRoommates,
-                        onNavigateToSplits = onNavigateToSplits
-                    )
-                }
-            }
-
-            // Graphical Spending Analysis by Category
-            item {
-                SpendingAnalyticsCard(
-                    categorySpends = categorySpends,
-                    totalSpend = totalSpend,
-                    onCategoryClick = { category ->
-                        onNavigateToTransactions(false, category)
-                    }
-                )
-            }
-
-            // Recent Transactions Section Header
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Recent Transactions",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    TextButton(onClick = { onNavigateToTransactions(false, null) }) {
                         Text(
-                            text = "See All (${transactions.size})",
-                            fontWeight = FontWeight.Bold,
-                            color = PrimaryIndigoDark,
-                            fontSize = 13.sp
+                            text = "₹",
+                            color = Color.White,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 17.sp
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Row {
+                        Text(
+                            "Spend",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 20.sp,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            "Tracker",
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 20.sp,
+                            color = PrimaryIndigoDark
                         )
                     }
                 }
-            }
 
-            val recentList = transactions.take(5)
-            if (recentList.isEmpty()) {
-                item {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow
+                if (pendingCount > 0) {
+                    IconButton(
+                        onClick = { onNavigateToTransactions(true, null) },
+                        modifier = Modifier.size(36.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        BadgedBox(
+                            badge = {
+                                Badge(
+                                    containerColor = AmberPending,
+                                    contentColor = Color.White
+                                ) { Text(pendingCount.toString()) }
+                            }
                         ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.ReceiptLong,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.size(36.dp)
+                                Icons.Default.Notifications,
+                                contentDescription = "Pending Review",
+                                tint = AmberPending,
+                                modifier = Modifier.size(22.dp)
                             )
-                            Spacer(Modifier.height(8.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Time Period Selector: [ Week | Month ] Pills + ‹ Date Navigator ›
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Segmented Pills: Week / Month
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer
+                    ) {
+                        Row(modifier = Modifier.padding(2.dp)) {
+                            val isWeek = periodType == PeriodType.WEEK
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isWeek) PrimaryIndigo else Color.Transparent)
+                                    .clickable { onPeriodTypeChange(PeriodType.WEEK) }
+                                    .padding(horizontal = 12.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = "Week",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isWeek) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isWeek) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (!isWeek) PrimaryIndigo else Color.Transparent)
+                                    .clickable { onPeriodTypeChange(PeriodType.MONTH) }
+                                    .padding(horizontal = 12.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = "Month",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (!isWeek) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (!isWeek) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Period Navigator: ‹ Label ›
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onPreviousPeriod,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.ChevronLeft,
+                                contentDescription = "Previous Period",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Text(
+                            text = periodLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .clickable { if (!isCurrentPeriod) onResetToCurrentPeriod() }
+                                .padding(horizontal = 4.dp)
+                        )
+
+                        IconButton(
+                            onClick = onNextPeriod,
+                            enabled = canGoForward,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = "Next Period",
+                                tint = if (canGoForward) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Pending Review Banner (if any uncategorized spends)
+        if (pendingCount > 0) {
+            item {
+                Surface(
+                    color = AmberContainer.copy(alpha = 0.85f),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateToTransactions(true, null) }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "No transactions logged yet",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
+                                text = "$pendingCount Uncategorized Spend${if (pendingCount > 1) "s" else ""}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = AmberPending
                             )
                             Text(
-                                text = "Incoming bank SMS will appear here automatically",
+                                text = "Tap to categorize & teach rules",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                        Button(
+                            onClick = { onNavigateToTransactions(true, null) },
+                            colors = ButtonDefaults.buttonColors(containerColor = AmberPending),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Review", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
                     }
                 }
-            } else {
-                items(recentList, key = { it.id }) { txn ->
-                    TransactionRowItem(transaction = txn)
+            }
+        }
+
+        // 4. Hero Spend Card - Clean, Well-Padded Fintech Card
+        item {
+            HeroSpendCard(
+                periodLabel = periodLabel,
+                periodType = periodType,
+                totalSpend = totalSpend,
+                dailyAverage = dailyAverage,
+                transactionCount = transactions.size
+            )
+        }
+
+        // 5. Quick Roommate Balance Card (if owed money)
+        if (totalOwedByRoommates > 0) {
+            item {
+                RoommateOwedQuickCard(
+                    totalOwed = totalOwedByRoommates,
+                    onNavigateToSplits = onNavigateToSplits
+                )
+            }
+        }
+
+        // 6. Graphical Spending Analysis by Category
+        item {
+            SpendingAnalyticsCard(
+                categorySpends = categorySpends,
+                totalSpend = totalSpend,
+                periodLabel = periodLabel,
+                onCategoryClick = { category ->
+                    onNavigateToTransactions(false, category)
+                }
+            )
+        }
+
+        // 7. Recent Transactions Section Header
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Recent Transactions",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                TextButton(onClick = { onNavigateToTransactions(false, null) }) {
+                    Text(
+                        text = "See All (${transactions.size})",
+                        fontWeight = FontWeight.Bold,
+                        color = PrimaryIndigoDark,
+                        fontSize = 13.sp
+                    )
                 }
             }
-
-            item { Spacer(Modifier.height(28.dp)) }
         }
+
+        val recentList = transactions.take(5)
+        if (recentList.isEmpty()) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ReceiptLong,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "No transactions logged in this period",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Switch time periods or wait for incoming bank SMS",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        } else {
+            items(recentList, key = { it.id }) { txn ->
+                TransactionRowItem(transaction = txn)
+            }
+        }
+
+        item { Spacer(Modifier.height(28.dp)) }
     }
 }
 
 /**
- * High-End Fintech Hero Balance Card with Glassmorphic gradient and financial metrics.
+ * High-End Fintech Hero Balance Card.
  */
 @Composable
 fun HeroSpendCard(
-    monthName: String,
+    periodLabel: String,
+    periodType: PeriodType,
     totalSpend: Double,
     dailyAverage: Double,
-    transactionCount: Int,
-    totalOwedByRoommates: Double,
-    onNavigateToSplits: () -> Unit
+    transactionCount: Int
 ) {
     val spendWhole = totalSpend.toLong()
     val spendCents = String.format(Locale.getDefault(), "%02d", ((totalSpend - spendWhole) * 100).toInt().coerceAtLeast(0))
+    val periodHeadline = if (periodType == PeriodType.WEEK) "TOTAL SPENT THIS WEEK" else "TOTAL SPENT THIS MONTH"
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(
                 Brush.linearGradient(
                     colors = listOf(
@@ -311,7 +416,7 @@ fun HeroSpendCard(
             .padding(20.dp)
     ) {
         Column {
-            // Month Chip & Badge
+            // Header Row: Period tag & Personal Share chip
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -321,25 +426,14 @@ fun HeroSpendCard(
                     shape = RoundedCornerShape(8.dp),
                     color = Color.White.copy(alpha = 0.12f)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.CalendarMonth,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.85f),
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = monthName.uppercase(Locale.ROOT),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White.copy(alpha = 0.9f),
-                            letterSpacing = 0.8.sp
-                        )
-                    }
+                    Text(
+                        text = periodLabel.uppercase(Locale.ROOT),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.9f),
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
                 }
 
                 Surface(
@@ -356,11 +450,11 @@ fun HeroSpendCard(
                 }
             }
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // Main Currency Hero
+            // Main Currency Display
             Text(
-                text = "TOTAL SPENT THIS MONTH",
+                text = periodHeadline,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.65f),
                 fontWeight = FontWeight.SemiBold,
@@ -379,25 +473,25 @@ fun HeroSpendCard(
                 )
                 Text(
                     text = String.format(Locale.getDefault(), "%,d", spendWhole),
-                    fontSize = 40.sp,
+                    fontSize = 38.sp,
                     fontWeight = FontWeight.Black,
                     color = Color.White,
                     letterSpacing = (-0.5).sp
                 )
                 Text(
                     text = ".$spendCents",
-                    fontSize = 22.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White.copy(alpha = 0.65f),
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // Embedded Metrics Row
+            // Embedded Sub-Metrics Row
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(12.dp),
                 color = Color.White.copy(alpha = 0.08f),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -427,7 +521,7 @@ fun HeroSpendCard(
                         Spacer(Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "Daily Pace",
+                                text = if (periodType == PeriodType.WEEK) "Daily Avg" else "Daily Pace",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.White.copy(alpha = 0.6f),
                                 fontSize = 10.sp
@@ -499,22 +593,22 @@ fun RoommateOwedQuickCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onNavigateToSplits),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(16.dp),
         color = EmeraldContainer.copy(alpha = 0.25f),
         border = BorderStroke(1.dp, EmeraldSuccess.copy(alpha = 0.35f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(EmeraldSuccess.copy(alpha = 0.18f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -522,10 +616,10 @@ fun RoommateOwedQuickCard(
                         Icons.Default.Group,
                         contentDescription = null,
                         tint = EmeraldSuccess,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
-                Spacer(Modifier.width(14.dp))
+                Spacer(Modifier.width(12.dp))
                 Column {
                     Text(
                         text = "Roommates Owe You",
@@ -535,7 +629,7 @@ fun RoommateOwedQuickCard(
                     )
                     Text(
                         text = String.format(Locale.getDefault(), "₹%.2f", totalOwed),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -545,8 +639,8 @@ fun RoommateOwedQuickCard(
             Button(
                 onClick = onNavigateToSplits,
                 colors = ButtonDefaults.buttonColors(containerColor = EmeraldSuccess),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(10.dp)
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 5.dp),
+                shape = RoundedCornerShape(8.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Ledger", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
@@ -559,13 +653,13 @@ fun RoommateOwedQuickCard(
 }
 
 /**
- * Graphical Spending Analysis Section:
- * Features a multi-segment proportional spending bar chart, followed by styled category rows.
+ * Graphical Spending Analysis Section.
  */
 @Composable
 fun SpendingAnalyticsCard(
     categorySpends: List<CategorySpendSummary>,
     totalSpend: Double,
+    periodLabel: String,
     onCategoryClick: (String) -> Unit
 ) {
     Surface(
@@ -576,7 +670,7 @@ fun SpendingAnalyticsCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp)
+                .padding(16.dp)
         ) {
             // Header
             Row(
@@ -592,7 +686,7 @@ fun SpendingAnalyticsCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${categorySpends.size} categories active",
+                        text = "$periodLabel • ${categorySpends.size} categories",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -613,14 +707,14 @@ fun SpendingAnalyticsCard(
             }
 
             if (categorySpends.isEmpty()) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
                 Text(
-                    text = "No categorized expenses yet this month.",
+                    text = "No categorized expenses in this period.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
 
                 // Multi-segment Proportional Spending Bar (Graphical Analysis Tool)
                 SpendProportionalBar(
@@ -628,9 +722,9 @@ fun SpendingAnalyticsCard(
                     totalSpend = totalSpend
                 )
 
-                Spacer(Modifier.height(16.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                Spacer(Modifier.height(6.dp))
 
                 // Compact Category List Rows with Real Vector Icons
                 categorySpends.forEachIndexed { index, cat ->
@@ -640,28 +734,27 @@ fun SpendingAnalyticsCard(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(10.dp))
                             .clickable { onCategoryClick(cat.category) }
-                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            CategoryAvatar(category = cat.category, size = 38.dp)
-                            Spacer(Modifier.width(12.dp))
+                            CategoryAvatar(category = cat.category, size = 36.dp)
+                            Spacer(Modifier.width(10.dp))
                             Column {
                                 Text(
                                     text = cat.category,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
-                                Spacer(Modifier.height(3.dp))
-                                // Mini progress bar per category
+                                Spacer(Modifier.height(2.dp))
                                 LinearProgressIndicator(
                                     progress = { percentage },
                                     modifier = Modifier
-                                        .width(110.dp)
+                                        .width(100.dp)
                                         .height(4.dp)
                                         .clip(RoundedCornerShape(2.dp)),
                                     color = catColor,
@@ -685,20 +778,20 @@ fun SpendingAnalyticsCard(
                                     color = catColor
                                 )
                             }
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(6.dp))
                             Icon(
                                 Icons.Default.ChevronRight,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
 
                     if (index < categorySpends.size - 1) {
                         HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
-                            modifier = Modifier.padding(start = 50.dp)
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f),
+                            modifier = Modifier.padding(start = 46.dp)
                         )
                     }
                 }
@@ -709,7 +802,6 @@ fun SpendingAnalyticsCard(
 
 /**
  * A sleek segmented proportional spending bar.
- * Visualizes the ratio of each category across the total monthly spend.
  */
 @Composable
 fun SpendProportionalBar(
@@ -719,11 +811,10 @@ fun SpendProportionalBar(
     if (totalSpend <= 0) return
 
     Column {
-        // Multi-colored segmented bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(10.dp)
+                .height(9.dp)
                 .clip(RoundedCornerShape(5.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
@@ -740,9 +831,9 @@ fun SpendProportionalBar(
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
 
-        // Quick Category Color Dot Legend
+        // Category Color Dots Legend
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -771,7 +862,7 @@ fun SpendProportionalBar(
 }
 
 /**
- * Modern Transaction List Row Item.
+ * Modern compact Transaction Row Item for Dashboard recent transactions.
  */
 @Composable
 fun TransactionRowItem(transaction: TransactionEntity) {
@@ -787,14 +878,14 @@ fun TransactionRowItem(transaction: TransactionEntity) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             MerchantAvatar(
                 merchantName = transaction.cleanMerchant ?: "Unknown Payee",
                 isDebit = isDebit,
                 category = transaction.category,
-                size = 42.dp
+                size = 40.dp
             )
 
             Spacer(Modifier.width(12.dp))
@@ -804,13 +895,17 @@ fun TransactionRowItem(transaction: TransactionEntity) {
                     text = transaction.cleanMerchant ?: "Unknown Payee",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = "${transaction.category ?: "Uncategorized"} • ${dateFormat.format(Date(transaction.timestampMillis))}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
 
@@ -821,25 +916,14 @@ fun TransactionRowItem(transaction: TransactionEntity) {
                         color = PrimaryIndigo.copy(alpha = 0.15f),
                         modifier = Modifier.padding(bottom = 2.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.CallSplit,
-                                contentDescription = null,
-                                tint = PrimaryIndigoDark,
-                                modifier = Modifier.size(10.dp)
-                            )
-                            Spacer(Modifier.width(3.dp))
-                            Text(
-                                text = "Split",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = PrimaryIndigoDark,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp
-                            )
-                        }
+                        Text(
+                            text = "✂️ Split",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = PrimaryIndigoDark,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
                     }
                 }
                 Text(
@@ -850,7 +934,7 @@ fun TransactionRowItem(transaction: TransactionEntity) {
                 )
                 if (isSplit) {
                     Text(
-                        text = "Bill ₹${String.format(Locale.getDefault(), "%.2f", transaction.amount)}",
+                        text = "Bill ₹${String.format(Locale.getDefault(), "%.0f", transaction.amount)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 10.sp
@@ -860,3 +944,4 @@ fun TransactionRowItem(transaction: TransactionEntity) {
         }
     }
 }
+
