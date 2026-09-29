@@ -1,0 +1,48 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Main Card / Wallet Body -->
+    <path
+        android:fillColor="#6366F1"
+        android:pathData="M30,36h48c3.31,0 6,2.69 6,6v28c0,3.31 -2.69,6 -6,6H30c-3.31,0 -6,-2.69 -6,-6V42C24,38.69 26.69,36 30,36Z" />
+
+    <!-- Wallet Flap Accent -->
+    <path
+        android:fillColor="#4F46E5"
+        android:pathData="M24,46h60v8c0,2.21 -1.79,4 -4,4H28c-2.21,0 -4,-1.79 -4,-4V46Z" />
+
+    <!-- Card Slot Accent Chip -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M66,54h14c1.1,0 2,0.9 2,2v6c0,1.1 -0.9,2 -2,2H66c-1.1,0 -2,-0.9 -2,-2v-6C64,54.9 64.9,54 66,54Z" />
+
+    <!-- Gold / White Lock / Dot -->
+    <path
+        android:fillColor="#FCD34D"
+        android:pathData="M73,59m-2,0a2,2 0,1,1 4,0a2,2 0,1,1 -4,0" />
+
+    <!-- Indian Rupee (₹) Symbol in Foreground -->
+    <!-- Top Bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,44h16v3h-16z" />
+    <!-- Second Bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,49h14v2.5h-14z" />
+    <!-- Curved Spine & Stem -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M39,44v21h3v-8.5c2.5,-0.2 5,-1.8 5,-5.5c0,-3.5 -2.5,-5.5 -6.5,-5.5h-1.5zM42,47h2c2,0 3.5,0.8 3.5,2.5c0,1.8 -1.5,2.5 -3.5,2.5h-2z" />
+    <!-- Rupee Downward Diagonal Stroke -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,54l7,11h4l-7.5,-11.5z" />
+
+    <!-- Sparkle / Star top right -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M78,32l1.5,3.5l3.5,1.5l-3.5,1.5l-1.5,3.5l-1.5,-3.5l-3.5,-1.5l3.5,-1.5z" />
+</vector>

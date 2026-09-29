@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/tv_notif_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Categorize Spend: ₹0.00"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF" />
+
+    <TextView
+        android:id="@+id/tv_notif_merchant"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Paid to Merchant"
+        android:textSize="13sp"
+        android:textColor="#94A3B8"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Row 1: Personal & Food -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="2">
+
+        <TextView
+            android:id="@+id/btn_notif_personal"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:gravity="center"
+            android:text="👤 Personal Spend"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_notif_chip" />
+
+        <TextView
+            android:id="@+id/btn_notif_food"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:gravity="center"
+            android:text="🍔 Food &amp; Dining"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_notif_chip" />
+    </LinearLayout>
+
+    <!-- Row 2: Groceries & Travel -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp"
+        android:weightSum="2">
+
+        <TextView
+            android:id="@+id/btn_notif_groceries"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:gravity="center"
+            android:text="🛒 Groceries"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_notif_chip" />
+
+        <TextView
+            android:id="@+id/btn_notif_travel"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:gravity="center"
+            android:text="🚗 Travel"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_notif_chip" />
+    </LinearLayout>
+
+    <!-- Row 3: Split / More Options -->
+    <TextView
+        android:id="@+id/btn_notif_more"
+        android:layout_width="match_parent"
+        android:layout_height="34dp"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:text="✂️ Split or Choose Other Category ➔"
+        android:textColor="#818CF8"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:background="@drawable/bg_notif_chip" />
+
+</LinearLayout>
