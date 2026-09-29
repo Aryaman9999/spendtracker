@@ -9,3 +9,5 @@
 .cxx
 SpendTracker*.apk
 app/build
+.kotlin
+
