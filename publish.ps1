@@ -65,8 +65,11 @@ if ($LASTEXITCODE -ne 0) {
 # 3. Copy APK to Project Root
 $builtApk = Join-Path $ProjectDir "app\build\outputs\apk\debug\app-debug.apk"
 $rootApk = Join-Path $ProjectDir "SpendTracker.apk"
+$versionedApk = Join-Path $ProjectDir "SpendTracker-v$vName.apk"
 Copy-Item $builtApk $rootApk -Force
+Copy-Item $builtApk $versionedApk -Force
 Write-Host "[+] Successfully created: $rootApk" -ForegroundColor Green
+Write-Host "[+] Successfully created: $versionedApk" -ForegroundColor Green
 
 # 4. Push to Google Drive via rclone (CLI)
 $cmd = Get-Command rclone -ErrorAction SilentlyContinue
@@ -87,10 +90,11 @@ if ($rcloneExe) {
     }
     if ($remotes -contains "gdrive:") {
         Write-Host "`n[+] Uploading to Google Drive via rclone..." -ForegroundColor Cyan
-        & $rcloneExe copy $rootApk "gdrive:SpendTracker/" --progress
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "[+] Successfully uploaded to Google Drive: SpendTracker/SpendTracker.apk" -ForegroundColor Green
-        }
+        & $rcloneExe copy $rootApk "gdrive:SpendTracker/" --log-level ERROR
+        & $rcloneExe copy $versionedApk "gdrive:SpendTracker/" --log-level ERROR
+        Write-Host "[+] Successfully uploaded to Google Drive:" -ForegroundColor Green
+        Write-Host "    • SpendTracker/SpendTracker.apk (latest)" -ForegroundColor Green
+        Write-Host "    • SpendTracker/SpendTracker-v$vName.apk" -ForegroundColor Green
     } else {
         Write-Host "`n[i] rclone is installed! Connect Google Drive once by running: rclone config" -ForegroundColor Yellow
         Write-Host "    (Choose 'n' -> Name: 'gdrive' -> Storage: 'drive' -> Follow browser prompt)" -ForegroundColor DarkGray
@@ -104,7 +108,8 @@ if (Test-Path (Join-Path $env:USERPROFILE "OneDrive")) {
         New-Item -ItemType Directory -Path $oneDrivePath -Force | Out-Null
     }
     Copy-Item $rootApk (Join-Path $oneDrivePath "SpendTracker.apk") -Force
-    Write-Host "[+] Synced to OneDrive: $oneDrivePath\SpendTracker.apk" -ForegroundColor Green
+    Copy-Item $versionedApk (Join-Path $oneDrivePath "SpendTracker-v$vName.apk") -Force
+    Write-Host "[+] Synced to OneDrive: $oneDrivePath" -ForegroundColor Green
 }
 
 # 6. Sync to Google Drive desktop virtual drive (if installed)

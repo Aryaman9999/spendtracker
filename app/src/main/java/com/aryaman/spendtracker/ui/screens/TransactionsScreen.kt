@@ -296,6 +296,7 @@ fun TransactionDetailCard(
                     MerchantAvatar(
                         merchantName = transaction.cleanMerchant ?: "Unknown Payee",
                         isDebit = isDebit,
+                        category = transaction.category,
                         size = 42.dp
                     )
                     Spacer(Modifier.width(12.dp))
