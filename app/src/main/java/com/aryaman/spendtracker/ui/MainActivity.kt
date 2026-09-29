@@ -42,6 +42,7 @@ enum class Screen {
 }
 
 enum class PeriodType {
+    DAY,
     WEEK,
     MONTH
 }
@@ -96,38 +97,55 @@ class MainActivity : ComponentActivity() {
 
                     val periodWindow = remember(selectedPeriodType, periodOffset) {
                         val cal = Calendar.getInstance()
-                        if (selectedPeriodType == PeriodType.MONTH) {
-                            cal.add(Calendar.MONTH, periodOffset)
-                            cal.set(Calendar.DAY_OF_MONTH, 1)
-                            cal.set(Calendar.HOUR_OF_DAY, 0)
-                            cal.set(Calendar.MINUTE, 0)
-                            cal.set(Calendar.SECOND, 0)
-                            cal.set(Calendar.MILLISECOND, 0)
-                            val start = cal.timeInMillis
-                            cal.add(Calendar.MONTH, 1)
-                            val end = cal.timeInMillis - 1
+                        when (selectedPeriodType) {
+                            PeriodType.DAY -> {
+                                cal.add(Calendar.DAY_OF_YEAR, periodOffset)
+                                cal.set(Calendar.HOUR_OF_DAY, 0)
+                                cal.set(Calendar.MINUTE, 0)
+                                cal.set(Calendar.SECOND, 0)
+                                cal.set(Calendar.MILLISECOND, 0)
+                                val start = cal.timeInMillis
+                                cal.add(Calendar.DAY_OF_YEAR, 1)
+                                val end = cal.timeInMillis - 1
+                                cal.timeInMillis = start
+                                val isCurrent = (periodOffset == 0)
+                                val label = if (isCurrent) "Today" else java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(cal.time)
+                                PeriodWindow(start, end, label, isCurrent)
+                            }
+                            PeriodType.WEEK -> {
+                                cal.firstDayOfWeek = Calendar.MONDAY
+                                cal.add(Calendar.WEEK_OF_YEAR, periodOffset)
+                                cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+                                cal.set(Calendar.HOUR_OF_DAY, 0)
+                                cal.set(Calendar.MINUTE, 0)
+                                cal.set(Calendar.SECOND, 0)
+                                cal.set(Calendar.MILLISECOND, 0)
+                                val start = cal.timeInMillis
+                                cal.add(Calendar.DAY_OF_YEAR, 7)
+                                val end = cal.timeInMillis - 1
 
-                            cal.timeInMillis = start
-                            val label = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(cal.time)
-                            val isCurrent = (periodOffset == 0)
-                            PeriodWindow(start, end, label, isCurrent)
-                        } else {
-                            cal.firstDayOfWeek = Calendar.MONDAY
-                            cal.add(Calendar.WEEK_OF_YEAR, periodOffset)
-                            cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-                            cal.set(Calendar.HOUR_OF_DAY, 0)
-                            cal.set(Calendar.MINUTE, 0)
-                            cal.set(Calendar.SECOND, 0)
-                            cal.set(Calendar.MILLISECOND, 0)
-                            val start = cal.timeInMillis
-                            cal.add(Calendar.DAY_OF_YEAR, 7)
-                            val end = cal.timeInMillis - 1
+                                val startLabel = java.text.SimpleDateFormat("dd MMM", java.util.Locale.getDefault()).format(java.util.Date(start))
+                                val endLabel = java.text.SimpleDateFormat("dd MMM", java.util.Locale.getDefault()).format(java.util.Date(end))
+                                val label = "$startLabel - $endLabel"
+                                val isCurrent = (periodOffset == 0)
+                                PeriodWindow(start, end, label, isCurrent)
+                            }
+                            PeriodType.MONTH -> {
+                                cal.add(Calendar.MONTH, periodOffset)
+                                cal.set(Calendar.DAY_OF_MONTH, 1)
+                                cal.set(Calendar.HOUR_OF_DAY, 0)
+                                cal.set(Calendar.MINUTE, 0)
+                                cal.set(Calendar.SECOND, 0)
+                                cal.set(Calendar.MILLISECOND, 0)
+                                val start = cal.timeInMillis
+                                cal.add(Calendar.MONTH, 1)
+                                val end = cal.timeInMillis - 1
 
-                            val startLabel = java.text.SimpleDateFormat("dd MMM", java.util.Locale.getDefault()).format(java.util.Date(start))
-                            val endLabel = java.text.SimpleDateFormat("dd MMM", java.util.Locale.getDefault()).format(java.util.Date(end))
-                            val label = "$startLabel - $endLabel"
-                            val isCurrent = (periodOffset == 0)
-                            PeriodWindow(start, end, label, isCurrent)
+                                cal.timeInMillis = start
+                                val label = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(cal.time)
+                                val isCurrent = (periodOffset == 0)
+                                PeriodWindow(start, end, label, isCurrent)
+                            }
                         }
                     }
 

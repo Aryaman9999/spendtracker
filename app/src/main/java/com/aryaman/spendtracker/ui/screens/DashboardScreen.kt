@@ -12,7 +12,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Group
@@ -25,6 +24,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aryaman.spendtracker.data.local.dao.CategorySpendSummary
@@ -37,6 +38,13 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.max
+
+data class BarChartItem(
+    val label: String,
+    val amount: Double,
+    val isHighlighted: Boolean
+)
 
 @Composable
 fun DashboardScreen(
@@ -58,25 +66,96 @@ fun DashboardScreen(
     val totalSpend = categorySpends.sumOf { it.totalAmount }
     val totalOwedByRoommates = roommateBalances.sumOf { it.totalUnsettled }
 
-    // Daily pace calculation
-    val divisorDays = remember(periodType) {
-        if (periodType == PeriodType.WEEK) 7
-        else {
-            val cal = Calendar.getInstance()
-            cal.get(Calendar.DAY_OF_MONTH).coerceAtLeast(1)
+    // Prepare chart bars based on periodType
+    val (chartBars, dailyAverage, highestSpendItem) = remember(transactions, periodType, totalSpend) {
+        val cal = Calendar.getInstance()
+        val currentDay = cal.get(Calendar.DAY_OF_MONTH)
+        val debitTxns = transactions.filter { it.direction == TransactionDirection.DEBIT }
+
+        when (periodType) {
+            PeriodType.DAY -> {
+                // 6 time blocks for the day (Morning, Midday, Afternoon, Evening, Night, Late Night)
+                val blocks = listOf(
+                    "6AM" to (6..9),
+                    "10AM" to (10..13),
+                    "2PM" to (14..17),
+                    "6PM" to (18..21),
+                    "10PM" to (22..24)
+                )
+                val bars = blocks.map { (label, hourRange) ->
+                    val sum = debitTxns.filter {
+                        cal.timeInMillis = it.timestampMillis
+                        cal.get(Calendar.HOUR_OF_DAY) in hourRange
+                    }.sumOf { it.myActualShare }
+                    BarChartItem(label, sum, isHighlighted = false)
+                }
+                val highest = debitTxns.maxByOrNull { it.myActualShare }?.let {
+                    Triple(SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(it.timestampMillis)), it.myActualShare, it.category ?: "Spend")
+                }
+                Triple(bars, totalSpend, highest)
+            }
+            PeriodType.WEEK -> {
+                // 7 days of the week: Mon to Sun
+                val dayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                val dayConstants = listOf(
+                    Calendar.MONDAY, Calendar.TUESDAY, Calendar.WEDNESDAY,
+                    Calendar.THURSDAY, Calendar.FRIDAY, Calendar.SATURDAY, Calendar.SUNDAY
+                )
+                val todayDow = cal.get(Calendar.DAY_OF_WEEK)
+                val bars = dayNames.mapIndexed { idx, name ->
+                    val dow = dayConstants[idx]
+                    val sum = debitTxns.filter {
+                        cal.timeInMillis = it.timestampMillis
+                        cal.get(Calendar.DAY_OF_WEEK) == dow
+                    }.sumOf { it.myActualShare }
+                    BarChartItem(name, sum, isHighlighted = (dow == todayDow))
+                }
+                val avg = totalSpend / 7.0
+                val highest = bars.maxByOrNull { it.amount }?.let {
+                    if (it.amount > 0) Triple(it.label, it.amount, "Weekly Peak") else null
+                }
+                Triple(bars, avg, highest)
+            }
+            PeriodType.MONTH -> {
+                // Days of the month: up to 30 days
+                val totalDaysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                val daySums = (1..totalDaysInMonth).map { day ->
+                    val sum = debitTxns.filter {
+                        cal.timeInMillis = it.timestampMillis
+                        cal.get(Calendar.DAY_OF_MONTH) == day
+                    }.sumOf { it.myActualShare }
+                    BarChartItem(
+                        label = if (day == 1 || day == 5 || day == 10 || day == 15 || day == 20 || day == 25 || day == currentDay) {
+                            if (day == currentDay) "Today" else day.toString()
+                        } else "",
+                        amount = sum,
+                        isHighlighted = (day == currentDay)
+                    )
+                }
+                val daysElapsed = currentDay.coerceAtLeast(1)
+                val avg = totalSpend / daysElapsed
+                val highestDayIndex = daySums.indices.maxByOrNull { daySums[it].amount } ?: -1
+                val highest = if (highestDayIndex >= 0 && daySums[highestDayIndex].amount > 0) {
+                    val dayNum = highestDayIndex + 1
+                    val topCatForDay = debitTxns.filter {
+                        cal.timeInMillis = it.timestampMillis
+                        cal.get(Calendar.DAY_OF_MONTH) == dayNum
+                    }.groupBy { it.category }.maxByOrNull { entry -> entry.value.sumOf { it.myActualShare } }?.key ?: "Spend"
+                    Triple("$dayNum ${SimpleDateFormat("MMM", Locale.getDefault()).format(cal.time)}", daySums[highestDayIndex].amount, topCatForDay)
+                } else null
+                Triple(daySums, avg, highest)
+            }
         }
     }
-    val dailyAverage = if (divisorDays > 0) totalSpend / divisorDays else 0.0
 
-    // No giant TopAppBar - everything is seamlessly placed inside LazyColumn with natural padding
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 1. Sleek, Low-Profile Brand Header (Replaces bulky TopAppBar)
+        // 1. Sleek Brand Header (Low-Profile)
         item {
             Row(
                 modifier = Modifier
@@ -88,213 +167,190 @@ fun DashboardScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(9.dp))
+                            .size(30.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(
-                                Brush.linearGradient(
-                                    listOf(PrimaryIndigo, Color(0xFF6366F1))
-                                )
+                                Brush.linearGradient(listOf(PrimaryIndigo, Color(0xFF6366F1)))
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "₹",
-                            color = Color.White,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 17.sp
-                        )
+                        Text("₹", color = Color.White, fontWeight = FontWeight.Black, fontSize = 16.sp)
                     }
                     Spacer(Modifier.width(10.dp))
                     Row {
-                        Text(
-                            "Spend",
-                            fontWeight = FontWeight.Black,
-                            fontSize = 20.sp,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            "Tracker",
-                            fontWeight = FontWeight.Normal,
-                            fontSize = 20.sp,
-                            color = PrimaryIndigoDark
-                        )
+                        Text("Spend", fontWeight = FontWeight.Black, fontSize = 19.sp, color = MaterialTheme.colorScheme.onBackground)
+                        Text("Tracker", fontWeight = FontWeight.Normal, fontSize = 19.sp, color = PrimaryIndigoDark)
                     }
                 }
 
                 if (pendingCount > 0) {
                     IconButton(
                         onClick = { onNavigateToTransactions(true, null) },
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(34.dp)
                     ) {
                         BadgedBox(
                             badge = {
-                                Badge(
-                                    containerColor = AmberPending,
-                                    contentColor = Color.White
-                                ) { Text(pendingCount.toString()) }
+                                Badge(containerColor = AmberPending, contentColor = Color.White) {
+                                    Text(pendingCount.toString())
+                                }
                             }
                         ) {
-                            Icon(
-                                Icons.Default.Notifications,
-                                contentDescription = "Pending Review",
-                                tint = AmberPending,
-                                modifier = Modifier.size(22.dp)
-                            )
+                            Icon(Icons.Default.Notifications, contentDescription = "Pending Review", tint = AmberPending, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
             }
         }
 
-        // 2. Time Period Selector: [ Week | Month ] Pills + ‹ Date Navigator ›
+        // 2. Headline Metric & Time Period Tabs (Direct Step Tracker Design)
         item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Large Spend Metric
+                Text(
+                    text = String.format(Locale.getDefault(), "₹%.2f", totalSpend),
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    letterSpacing = (-0.5).sp
+                )
+                Text(
+                    text = "$periodLabel • ${transactions.size} spends logged",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                // [ Day | Week | Month ] Pill Buttons
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Segmented Pills: Week / Month
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainer
-                    ) {
-                        Row(modifier = Modifier.padding(2.dp)) {
-                            val isWeek = periodType == PeriodType.WEEK
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isWeek) PrimaryIndigo else Color.Transparent)
-                                    .clickable { onPeriodTypeChange(PeriodType.WEEK) }
-                                    .padding(horizontal = 12.dp, vertical = 5.dp)
-                            ) {
-                                Text(
-                                    text = "Week",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (isWeek) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isWeek) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (!isWeek) PrimaryIndigo else Color.Transparent)
-                                    .clickable { onPeriodTypeChange(PeriodType.MONTH) }
-                                    .padding(horizontal = 12.dp, vertical = 5.dp)
-                            ) {
-                                Text(
-                                    text = "Month",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (!isWeek) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (!isWeek) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
-                    // Period Navigator: ‹ Label ›
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = onPreviousPeriod,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.ChevronLeft,
-                                contentDescription = "Previous Period",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        Text(
-                            text = periodLabel,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
+                    listOf(
+                        PeriodType.DAY to "Day",
+                        PeriodType.WEEK to "Week",
+                        PeriodType.MONTH to "Month"
+                    ).forEach { (type, label) ->
+                        val isSelected = periodType == type
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.surfaceContainer,
                             modifier = Modifier
-                                .clickable { if (!isCurrentPeriod) onResetToCurrentPeriod() }
-                                .padding(horizontal = 4.dp)
-                        )
-
-                        IconButton(
-                            onClick = onNextPeriod,
-                            enabled = canGoForward,
-                            modifier = Modifier.size(32.dp)
+                                .weight(1f)
+                                .clickable { onPeriodTypeChange(type) }
                         ) {
-                            Icon(
-                                Icons.Default.ChevronRight,
-                                contentDescription = "Next Period",
-                                tint = if (canGoForward) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
-                                modifier = Modifier.size(20.dp)
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 9.dp)
                             )
                         }
                     }
                 }
-            }
-        }
 
-        // 3. Pending Review Banner (if any uncategorized spends)
-        if (pendingCount > 0) {
-            item {
-                Surface(
-                    color = AmberContainer.copy(alpha = 0.85f),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onNavigateToTransactions(true, null) }
+                Spacer(Modifier.height(8.dp))
+
+                // Date Navigator Row: ‹ Date Label ›
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    IconButton(
+                        onClick = onPreviousPeriod,
+                        modifier = Modifier.size(28.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "$pendingCount Uncategorized Spend${if (pendingCount > 1) "s" else ""}",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = AmberPending
-                            )
-                            Text(
-                                text = "Tap to categorize & teach rules",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Button(
-                            onClick = { onNavigateToTransactions(true, null) },
-                            colors = ButtonDefaults.buttonColors(containerColor = AmberPending),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text("Review", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
+                        Icon(Icons.Default.ChevronLeft, contentDescription = "Previous", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    }
+                    Text(
+                        text = periodLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .clickable { if (!isCurrentPeriod) onResetToCurrentPeriod() }
+                            .padding(horizontal = 8.dp)
+                    )
+                    IconButton(
+                        onClick = onNextPeriod,
+                        enabled = canGoForward,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "Next",
+                            tint = if (canGoForward) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }
         }
 
-        // 4. Hero Spend Card - Clean, Well-Padded Fintech Card
+        // 3. Step Tracker Inspired Vertical Bar Chart Card
         item {
-            HeroSpendCard(
-                periodLabel = periodLabel,
-                periodType = periodType,
+            StepTrackerSpendChartCard(
+                chartBars = chartBars,
                 totalSpend = totalSpend,
                 dailyAverage = dailyAverage,
-                transactionCount = transactions.size
+                periodType = periodType
             )
         }
 
-        // 5. Quick Roommate Balance Card (if owed money)
+        // 4. "Highest Single-Day Spend" Highlight Card (Inspired by Step Tracker Record Card)
+        if (highestSpendItem != null && highestSpendItem.second > 0) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = "Highest single-day spend",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = highestSpendItem.first,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = String.format(Locale.getDefault(), "₹%.2f", highestSpendItem.second),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = RoseDebit
+                            )
+                            Text(
+                                text = highestSpendItem.third,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Roommates Unsettled Balance Widget
         if (totalOwedByRoommates > 0) {
             item {
                 RoommateOwedQuickCard(
@@ -386,195 +442,135 @@ fun DashboardScreen(
 }
 
 /**
- * High-End Fintech Hero Balance Card.
+ * Step Tracker Style Vertical Bar Chart Card.
+ * Displays vertical pill bars for each time unit with top summary statistics.
  */
 @Composable
-fun HeroSpendCard(
-    periodLabel: String,
-    periodType: PeriodType,
+fun StepTrackerSpendChartCard(
+    chartBars: List<BarChartItem>,
     totalSpend: Double,
     dailyAverage: Double,
-    transactionCount: Int
+    periodType: PeriodType
 ) {
-    val spendWhole = totalSpend.toLong()
-    val spendCents = String.format(Locale.getDefault(), "%02d", ((totalSpend - spendWhole) * 100).toInt().coerceAtLeast(0))
-    val periodHeadline = if (periodType == PeriodType.WEEK) "TOTAL SPENT THIS WEEK" else "TOTAL SPENT THIS MONTH"
+    val maxBarAmount = remember(chartBars) {
+        max(chartBars.maxOfOrNull { it.amount } ?: 0.0, 100.0)
+    }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xFF2E1065),
-                        Color(0xFF1E1B4B),
-                        Color(0xFF0F172A)
-                    )
-                )
-            )
-            .padding(20.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
-        Column {
-            // Header Row: Period tag & Personal Share chip
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 18.dp)
+        ) {
+            // Chart Canvas Area: Vertical Rounded Bars
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp)
             ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color.White.copy(alpha = 0.12f)
+                // Bars Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 22.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    Text(
-                        text = periodLabel.uppercase(Locale.ROOT),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.9f),
-                        letterSpacing = 0.8.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
+                    chartBars.forEach { item ->
+                        val ratio = (item.amount / maxBarAmount).toFloat().coerceIn(0.04f, 1f)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Bottom,
+                            modifier = Modifier.fillMaxHeight()
+                        ) {
+                            // The Bar: Background pill track + Foreground filled pill
+                            Box(
+                                modifier = Modifier
+                                    .width(if (periodType == PeriodType.MONTH) 6.dp else 22.dp)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                contentAlignment = Alignment.BottomCenter
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .fillMaxHeight(ratio)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(
+                                            if (item.isHighlighted) EmeraldSuccess
+                                            else if (item.amount > 0) PrimaryIndigo
+                                            else Color.Transparent
+                                        )
+                                )
+                            }
+                        }
+                    }
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = EmeraldSuccess.copy(alpha = 0.20f)
-                ) {
-                    Text(
-                        text = "✓ Personal Share",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6EE7B7),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // Main Currency Display
-            Text(
-                text = periodHeadline,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.65f),
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.sp
-            )
-
-            Spacer(Modifier.height(4.dp))
-
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = "₹",
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White.copy(alpha = 0.75f),
-                    modifier = Modifier.padding(bottom = 6.dp, end = 2.dp)
-                )
-                Text(
-                    text = String.format(Locale.getDefault(), "%,d", spendWhole),
-                    fontSize = 38.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White,
-                    letterSpacing = (-0.5).sp
-                )
-                Text(
-                    text = ".$spendCents",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = 0.65f),
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // Embedded Sub-Metrics Row
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White.copy(alpha = 0.08f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
+                // X-Axis Labels Row
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .align(Alignment.BottomCenter),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Daily average
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.TrendingUp,
-                                contentDescription = null,
-                                tint = Color(0xFF93C5FD),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Column {
+                    chartBars.forEach { item ->
+                        if (item.label.isNotEmpty()) {
                             Text(
-                                text = if (periodType == PeriodType.WEEK) "Daily Avg" else "Daily Pace",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.6f),
-                                fontSize = 10.sp
+                                text = item.label,
+                                fontSize = 9.sp,
+                                fontWeight = if (item.isHighlighted) FontWeight.Bold else FontWeight.Normal,
+                                color = if (item.isHighlighted) EmeraldSuccess else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
-                            Text(
-                                text = String.format(Locale.getDefault(), "₹%.0f/day", dailyAverage),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                        } else {
+                            Spacer(Modifier.width(1.dp))
                         }
                     }
+                }
+            }
 
-                    // Divider
-                    Box(
-                        modifier = Modifier
-                            .height(24.dp)
-                            .width(1.dp)
-                            .background(Color.White.copy(alpha = 0.15f))
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+            Spacer(Modifier.height(12.dp))
+
+            // Two-column Summary Stats (Matching Step Tracker layout: Step count & Distance)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Total Spend",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = String.format(Locale.getDefault(), "₹%.2f", totalSpend),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
 
-                    // Transaction count
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ReceiptLong,
-                                contentDescription = null,
-                                tint = Color(0xFFA78BFA),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "Activity",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.6f),
-                                fontSize = 10.sp
-                            )
-                            Text(
-                                text = "$transactionCount spends",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (periodType == PeriodType.WEEK) "Daily Average" else "Daily Pace",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = String.format(Locale.getDefault(), "₹%.0f/day", dailyAverage),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
         }
@@ -680,7 +676,7 @@ fun SpendingAnalyticsCard(
             ) {
                 Column {
                     Text(
-                        text = "Spending Analysis",
+                        text = "Spending by Category",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -897,7 +893,7 @@ fun TransactionRowItem(transaction: TransactionEntity) {
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
@@ -905,7 +901,7 @@ fun TransactionRowItem(transaction: TransactionEntity) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -944,4 +940,3 @@ fun TransactionRowItem(transaction: TransactionEntity) {
         }
     }
 }
-
