@@ -667,8 +667,8 @@ fun RoommateOwedQuickCard(
             .fillMaxWidth()
             .clickable(onClick = onNavigateToSplits),
         shape = RoundedCornerShape(16.dp),
-        color = EmeraldContainer.copy(alpha = 0.25f),
-        border = BorderStroke(1.dp, EmeraldSuccess.copy(alpha = 0.35f))
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Row(
             modifier = Modifier
@@ -946,7 +946,8 @@ fun TransactionRowItem(transaction: TransactionEntity) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
     ) {
         Row(
             modifier = Modifier

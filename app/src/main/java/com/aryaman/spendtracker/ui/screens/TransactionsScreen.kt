@@ -1,6 +1,9 @@
 package com.aryaman.spendtracker.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -79,24 +82,48 @@ fun TransactionsScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Sleek Low-Profile Header (Consistent with Home and Splits)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Transactions",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(Modifier.width(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
                     Text(
-                        "All Transactions",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        text = "${filteredList.size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                     )
                 }
-            )
+            }
+
+            if (selectedCategoryFilter != null) {
+                TextButton(
+                    onClick = onClearCategoryFilter,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text("Clear Filter", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
+                }
+            }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
             // Active Category Filter Banner (Compact Pill)
             if (selectedCategoryFilter != null) {
                 val catColor = getCategoryColor(selectedCategoryFilter)
@@ -235,7 +262,6 @@ fun TransactionsScreen(
                 }
             }
         }
-    }
 
     // Category Picker Dialog
     transactionToCategorize?.let { txn ->
@@ -285,10 +311,16 @@ fun TransactionDetailCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { isExpanded = !isExpanded },
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+        onClick = { isExpanded = !isExpanded }
     ) {
         Column(
             modifier = Modifier
@@ -368,7 +400,7 @@ fun TransactionDetailCard(
             }
 
             // Expandable Details (Smoothly revealed ONLY when user taps!)
-            AnimatedVisibility(visible = isExpanded) {
+            if (isExpanded) {
                 Column(modifier = Modifier.padding(top = 12.dp)) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                     Spacer(Modifier.height(10.dp))

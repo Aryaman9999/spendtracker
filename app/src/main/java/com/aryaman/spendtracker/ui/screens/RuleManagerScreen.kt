@@ -45,16 +45,6 @@ fun RuleManagerScreen(
     var showAddRuleDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Rules & Banks", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = onNavigateToColorOsGuide) {
-                        Icon(Icons.Default.Build, contentDescription = "ColorOS Setup")
-                    }
-                }
-            )
-        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
@@ -77,6 +67,32 @@ fun RuleManagerScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Sleek Low-Profile Header (Matching Home, Spends, and Splits)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Rules & Banks",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                IconButton(
+                    onClick = onNavigateToColorOsGuide,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Build,
+                        contentDescription = "ColorOS Setup",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
             // Tab Selector
             PrimaryTabRow(
                 selectedTabIndex = selectedTab,
