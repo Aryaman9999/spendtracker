@@ -13,10 +13,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallSplit
+import androidx.compose.material.icons.automirrored.filled.Comment
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,6 +59,8 @@ fun TransactionsScreen(
     onClearCategoryFilter: () -> Unit = {},
     onCategorize: (id: Long, category: String, createRule: Boolean) -> Unit,
     onSplit: (id: Long, myActualShare: Double, splits: List<SplitEntryEntity>) -> Unit,
+    onToggleSplit: (id: Long) -> Unit = {},
+    onUpdateComment: (id: Long, comment: String?) -> Unit = { _, _ -> },
     onDelete: (id: Long) -> Unit
 ) {
     var selectedFilter by remember {
@@ -256,6 +261,8 @@ fun TransactionsScreen(
                             splits = splitsByTxnId[txn.id] ?: emptyList(),
                             onOpenCategoryPicker = { transactionToCategorize = txn },
                             onOpenSplitDialog = { transactionToSplit = txn },
+                            onToggleSplit = { onToggleSplit(txn.id) },
+                            onUpdateComment = { comment -> onUpdateComment(txn.id, comment) },
                             onDelete = { onDelete(txn.id) }
                         )
                     }
@@ -300,6 +307,8 @@ fun TransactionDetailCard(
     splits: List<SplitEntryEntity> = emptyList(),
     onOpenCategoryPicker: () -> Unit,
     onOpenSplitDialog: () -> Unit,
+    onToggleSplit: () -> Unit,
+    onUpdateComment: (String?) -> Unit,
     onDelete: () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
@@ -342,7 +351,7 @@ fun TransactionDetailCard(
 
                 Spacer(Modifier.width(12.dp))
 
-                // Payee & Date (Ellipsized to NEVER wrap onto multi-line mess)
+                // Payee, Date & Comment Preview
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = transaction.cleanMerchant ?: "Unknown Payee",
@@ -360,28 +369,64 @@ fun TransactionDetailCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (!transaction.comment.isNullOrBlank()) {
+                        Spacer(Modifier.height(2.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 1.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Comment,
+                                contentDescription = "Note",
+                                tint = PrimaryIndigo,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = transaction.comment,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
                 }
 
                 Spacer(Modifier.width(8.dp))
 
-                // Amount & Split Badge
+                // Amount & Direct Split Tag
                 Column(horizontalAlignment = Alignment.End) {
-                    if (isSplit) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = PrimaryIndigo.copy(alpha = 0.15f),
-                            modifier = Modifier.padding(bottom = 2.dp)
+                    // Direct Split Tag: 1-tap toggle to categorize spend as split or not!
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (isSplit) PrimaryIndigo.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = if (isSplit) BorderStroke(0.8.dp, PrimaryIndigo.copy(alpha = 0.35f)) else null,
+                        onClick = onToggleSplit,
+                        modifier = Modifier.padding(bottom = 3.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.CallSplit,
+                                contentDescription = if (isSplit) "Split Spend (Tap to un-split)" else "Mark as Split Spend",
+                                tint = if (isSplit) PrimaryIndigoDark else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(Modifier.width(3.dp))
                             Text(
-                                text = "✂️ Split",
+                                text = if (isSplit) "Split" else "+ Split",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = PrimaryIndigoDark,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                color = if (isSplit) PrimaryIndigoDark else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = if (isSplit) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 10.sp
                             )
                         }
                     }
+
                     Text(
                         text = (if (isDebit) "- " else "+ ") + String.format(Locale.getDefault(), "₹%.2f", transaction.myActualShare),
                         style = MaterialTheme.typography.titleMedium,
@@ -449,6 +494,39 @@ fun TransactionDetailCard(
                         }
                     }
 
+                    // Spend Type Selector
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Spend Type",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilterChip(
+                                selected = !isSplit,
+                                onClick = { if (isSplit) onToggleSplit() },
+                                label = { Text("Personal", fontSize = 11.sp, fontWeight = if (!isSplit) FontWeight.Bold else FontWeight.Normal) },
+                                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(12.dp)) },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(28.dp)
+                            )
+                            FilterChip(
+                                selected = isSplit,
+                                onClick = { if (!isSplit) onToggleSplit() },
+                                label = { Text("Split Spend", fontSize = 11.sp, fontWeight = if (isSplit) FontWeight.Bold else FontWeight.Normal) },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.CallSplit, contentDescription = null, modifier = Modifier.size(12.dp)) },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(28.dp)
+                            )
+                        }
+                    }
+
                     // Compact Split Breakdown if split
                     if (isSplit) {
                         Spacer(Modifier.height(10.dp))
@@ -502,13 +580,94 @@ fun TransactionDetailCard(
                                         }
                                     }
                                 }
+
+                                Spacer(Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    TextButton(
+                                        onClick = onOpenSplitDialog,
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("Customize Split / Roommates ➔", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
+                                    }
+                                }
                             }
                         }
                     }
 
+                    // Comment / Note Section
                     Spacer(Modifier.height(10.dp))
+                    var noteText by remember(transaction.comment) { mutableStateOf(transaction.comment ?: "") }
+                    var isEditingNote by remember { mutableStateOf(false) }
 
-                    // Actions: Category Chip, Split Button, Delete
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Comment / Note",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (isEditingNote && noteText.trim() != (transaction.comment ?: "")) {
+                                TextButton(
+                                    onClick = {
+                                        onUpdateComment(noteText.trim().ifEmpty { null })
+                                        isEditingNote = false
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                ) {
+                                    Text("Save Note", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = PrimaryIndigo)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value = noteText,
+                            onValueChange = {
+                                noteText = it
+                                isEditingNote = true
+                            },
+                            placeholder = {
+                                Text(
+                                    "Add a comment or note...",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                            singleLine = false,
+                            maxLines = 3,
+                            trailingIcon = {
+                                if (isEditingNote && noteText.trim() != (transaction.comment ?: "")) {
+                                    IconButton(
+                                        onClick = {
+                                            onUpdateComment(noteText.trim().ifEmpty { null })
+                                            isEditingNote = false
+                                        }
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = "Save Note",
+                                            tint = EmeraldSuccess,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Actions: Category Chip, Split Button (if not split), Delete
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -530,15 +689,17 @@ fun TransactionDetailCard(
                         )
 
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FilledTonalButton(
-                                onClick = onOpenSplitDialog,
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.CallSplit, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Split", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            if (!isSplit) {
+                                FilledTonalButton(
+                                    onClick = onOpenSplitDialog,
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.CallSplit, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Split", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
 
                             IconButton(

@@ -281,6 +281,16 @@ class MainActivity : ComponentActivity() {
                                             repository.splitTransaction(id, myActualShare, splitsList)
                                         }
                                     },
+                                    onToggleSplit = { id ->
+                                        scope.launch(Dispatchers.IO) {
+                                            repository.toggleQuickSplit(id)
+                                        }
+                                    },
+                                    onUpdateComment = { id, comment ->
+                                        scope.launch(Dispatchers.IO) {
+                                            repository.updateTransactionComment(id, comment)
+                                        }
+                                    },
                                     onDelete = { id ->
                                         scope.launch(Dispatchers.IO) {
                                             repository.deleteTransaction(id)

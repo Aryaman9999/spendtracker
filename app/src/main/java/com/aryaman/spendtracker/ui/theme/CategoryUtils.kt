@@ -5,15 +5,23 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.LocalMall
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Subscriptions
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,6 +50,14 @@ fun getCategoryColor(category: String?): Color {
         "bills & utilities", "bills" -> CategoryBills
         "entertainment" -> CategoryEntertainment
         "health & medical", "health" -> CategoryHealth
+        "rent" -> CategoryRent
+        "subscriptions", "subscription" -> CategorySubscriptions
+        "emi & loans", "emi", "loans", "loan" -> CategoryEmi
+        "investments", "investment" -> CategoryInvestments
+        "education" -> CategoryEducation
+        "fuel", "petrol" -> CategoryFuel
+        "insurance" -> CategoryInsurance
+        "gifts & donations", "gifts", "gift", "donations" -> CategoryGifts
         else -> CategoryOther
     }
 }
@@ -59,6 +75,14 @@ fun getCategoryIcon(category: String?): ImageVector {
         "bills & utilities", "bills" -> Icons.Default.FlashOn
         "entertainment" -> Icons.Default.Movie
         "health & medical", "health" -> Icons.Default.LocalHospital
+        "rent" -> Icons.Default.Home
+        "subscriptions", "subscription" -> Icons.Default.Subscriptions
+        "emi & loans", "emi", "loans", "loan" -> Icons.Default.AccountBalance
+        "investments", "investment" -> Icons.AutoMirrored.Filled.TrendingUp
+        "education" -> Icons.Default.School
+        "fuel", "petrol" -> Icons.Default.LocalGasStation
+        "insurance" -> Icons.Default.Shield
+        "gifts & donations", "gifts", "gift", "donations" -> Icons.Default.CardGiftcard
         else -> Icons.Default.Category
     }
 }
@@ -76,6 +100,14 @@ fun getCategoryInitial(category: String?): String {
         "bills & utilities", "bills" -> "B"
         "entertainment" -> "E"
         "health & medical", "health" -> "H"
+        "rent" -> "R"
+        "subscriptions", "subscription" -> "S"
+        "emi & loans", "emi", "loans", "loan" -> "L"
+        "investments", "investment" -> "I"
+        "education" -> "E"
+        "fuel", "petrol" -> "F"
+        "insurance" -> "I"
+        "gifts & donations", "gifts", "gift", "donations" -> "G"
         else -> "?"
     }
 }

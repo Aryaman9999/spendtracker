@@ -28,6 +28,9 @@ interface SplitEntryDao {
     @Query("SELECT * FROM split_entries ORDER BY id DESC")
     fun getAllSplits(): Flow<List<SplitEntryEntity>>
 
+    @Query("SELECT roommateName FROM split_entries ORDER BY id DESC LIMIT 1")
+    suspend fun getMostRecentRoommateName(): String?
+
     @Query("""
         SELECT 
             roommateName,

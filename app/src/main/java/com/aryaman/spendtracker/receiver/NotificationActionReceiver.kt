@@ -32,11 +32,21 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 // Dismiss the notification
                 NotificationManagerCompat.from(context).cancel(txnId.toInt())
             }
+        } else if (intent.action == ACTION_SPLIT) {
+            val txnId = intent.getLongExtra(EXTRA_TXN_ID, -1L)
+            if (txnId != -1L) {
+                val repository = (context.applicationContext as SpendTrackerApp).repository
+                CoroutineScope(Dispatchers.IO).launch {
+                    repository.toggleQuickSplit(txnId)
+                }
+                NotificationManagerCompat.from(context).cancel(txnId.toInt())
+            }
         }
     }
 
     companion object {
         const val ACTION_CATEGORIZE = "com.aryaman.spendtracker.ACTION_CATEGORIZE"
+        const val ACTION_SPLIT = "com.aryaman.spendtracker.ACTION_SPLIT"
         const val EXTRA_TXN_ID = "EXTRA_TXN_ID"
         const val EXTRA_CATEGORY = "EXTRA_CATEGORY"
         const val EXTRA_MERCHANT = "EXTRA_MERCHANT"

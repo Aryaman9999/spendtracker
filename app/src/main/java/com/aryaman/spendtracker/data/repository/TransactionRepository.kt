@@ -165,6 +165,41 @@ class TransactionRepository(
         }
     }
 
+    suspend fun updateTransactionComment(transactionId: Long, comment: String?) {
+        transactionDao.updateComment(transactionId, comment?.trim()?.ifEmpty { null })
+    }
+
+    /**
+     * Toggles split status for a transaction:
+     * If currently split, reverts to personal (myActualShare = amount, removes split entries).
+     * If not split, splits 50/50 with the most recent roommate (or "Roommate" if none).
+     */
+    suspend fun toggleQuickSplit(transactionId: Long): Boolean {
+        val transaction = transactionDao.getTransactionById(transactionId) ?: return false
+        val currentSplits = splitEntryDao.getSplitsForTransactionList(transactionId)
+        val isCurrentlySplit = transaction.myActualShare != transaction.amount || currentSplits.isNotEmpty()
+
+        if (isCurrentlySplit) {
+            transactionDao.update(transaction.copy(myActualShare = transaction.amount))
+            splitEntryDao.deleteForTransaction(transactionId)
+            return false
+        } else {
+            val half = transaction.amount / 2.0
+            val recentRoommate = splitEntryDao.getMostRecentRoommateName() ?: "Roommate"
+            transactionDao.update(transaction.copy(myActualShare = half))
+            splitEntryDao.deleteForTransaction(transactionId)
+            splitEntryDao.insert(
+                SplitEntryEntity(
+                    transactionId = transactionId,
+                    roommateName = recentRoommate,
+                    amountOwed = half,
+                    settled = false
+                )
+            )
+            return true
+        }
+    }
+
     fun getSplitsForTransaction(transactionId: Long): Flow<List<SplitEntryEntity>> =
         splitEntryDao.getSplitsForTransaction(transactionId)
 

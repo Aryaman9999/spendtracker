@@ -73,6 +73,9 @@ interface TransactionDao {
     """)
     fun getTotalSpendInWindow(startTimestamp: Long, endTimestamp: Long): Flow<Double?>
 
+    @Query("UPDATE transactions SET comment = :comment WHERE id = :id")
+    suspend fun updateComment(id: Long, comment: String?)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(transaction: TransactionEntity): Long
 

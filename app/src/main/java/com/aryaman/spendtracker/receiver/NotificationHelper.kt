@@ -54,6 +54,17 @@ object NotificationHelper {
         val groceryPendingIntent = createCategoryActionIntent("Groceries", 3)
         val travelPendingIntent = createCategoryActionIntent("Travel & Commute", 4)
 
+        val splitIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+            action = NotificationActionReceiver.ACTION_SPLIT
+            putExtra(NotificationActionReceiver.EXTRA_TXN_ID, transactionId)
+        }
+        val splitPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId * 100 + 5,
+            splitIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val formattedAmount = String.format(Locale.getDefault(), "₹%.2f", amount)
 
         // Build Custom Expanded View (Bypasses Android's 3-action limit, fitting all 4 categories without truncation!)
@@ -75,12 +86,13 @@ object NotificationHelper {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(openAppPendingIntent)
             .setAutoCancel(true)
+            .setGroup(GROUP_SPEND_REVIEW)
             .setCustomBigContentView(remoteViews)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-            // Fallback compact actions for collapsed view
+            // Fallback compact actions for collapsed view (includes quick 50/50 split!)
             .addAction(0, "👤 Personal", personalPendingIntent)
+            .addAction(0, "✂️ Split 50/50", splitPendingIntent)
             .addAction(0, "🍔 Food", foodPendingIntent)
-            .addAction(0, "🛒 Grocery", groceryPendingIntent)
 
         try {
             NotificationManagerCompat.from(context).notify(notificationId, builder.build())
@@ -88,4 +100,6 @@ object NotificationHelper {
             // Permission POST_NOTIFICATIONS may not be granted yet
         }
     }
+
+    const val GROUP_SPEND_REVIEW = "com.aryaman.spendtracker.SPEND_REVIEW_GROUP"
 }

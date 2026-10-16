@@ -30,5 +30,6 @@ data class TransactionEntity(
     val status: TransactionStatus = TransactionStatus.PENDING_REVIEW,
     val ruleIdApplied: Long? = null,
     val referenceNumber: String? = null,
-    val accountInfo: String? = null
+    val accountInfo: String? = null,
+    val comment: String? = null
 )

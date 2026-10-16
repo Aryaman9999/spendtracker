@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
         CategoryEntity::class,
         SmsTemplateEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -62,6 +62,51 @@ abstract class SpendDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Add comment column to transactions
+                db.execSQL("ALTER TABLE transactions ADD COLUMN comment TEXT DEFAULT NULL")
+
+                // 2. Insert new categories for existing installations
+                val newCategories = listOf(
+                    Triple("Rent", "#B45309", "home"),
+                    Triple("Subscriptions", "#7C3AED", "subscriptions"),
+                    Triple("EMI & Loans", "#DC2626", "account_balance"),
+                    Triple("Investments", "#0D9488", "trending_up"),
+                    Triple("Education", "#2563EB", "school"),
+                    Triple("Fuel", "#EA580C", "local_gas_station"),
+                    Triple("Insurance", "#4338CA", "shield"),
+                    Triple("Gifts & Donations", "#DB2777", "card_giftcard")
+                )
+                for ((name, color, icon) in newCategories) {
+                    db.execSQL(
+                        "INSERT INTO categories (name, colorHex, iconName) SELECT '$name', '$color', '$icon' WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = '$name')"
+                    )
+                }
+
+                // 3. Insert new default rules for subscriptions, investments, fuel
+                val newRules = listOf(
+                    Triple("netflix", "Subscriptions", 11),
+                    Triple("spotify", "Subscriptions", 12),
+                    Triple("hotstar", "Subscriptions", 13),
+                    Triple("prime", "Subscriptions", 14),
+                    Triple("youtube", "Subscriptions", 15),
+                    Triple("zerodha", "Investments", 16),
+                    Triple("groww", "Investments", 17),
+                    Triple("petrol", "Fuel", 18),
+                    Triple("fuel", "Fuel", 19),
+                    Triple("hpcl", "Fuel", 20),
+                    Triple("bpcl", "Fuel", 21),
+                    Triple("iocl", "Fuel", 22)
+                )
+                for ((keyword, category, priority) in newRules) {
+                    db.execSQL(
+                        "INSERT INTO category_rules (keyword, category, priority, isRegex) SELECT '$keyword', '$category', $priority, 0 WHERE NOT EXISTS (SELECT 1 FROM category_rules WHERE keyword = '$keyword')"
+                    )
+                }
+            }
+        }
+
         fun getInstance(context: Context): SpendDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -79,7 +124,7 @@ abstract class SpendDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
@@ -97,6 +142,14 @@ abstract class SpendDatabase : RoomDatabase() {
                 CategoryEntity(name = "Bills & Utilities", colorHex = "#FF9800", iconName = "receipt"),
                 CategoryEntity(name = "Entertainment", colorHex = "#E91E63", iconName = "movie"),
                 CategoryEntity(name = "Health & Medical", colorHex = "#00BCD4", iconName = "local_hospital"),
+                CategoryEntity(name = "Rent", colorHex = "#B45309", iconName = "home"),
+                CategoryEntity(name = "Subscriptions", colorHex = "#7C3AED", iconName = "subscriptions"),
+                CategoryEntity(name = "EMI & Loans", colorHex = "#DC2626", iconName = "account_balance"),
+                CategoryEntity(name = "Investments", colorHex = "#0D9488", iconName = "trending_up"),
+                CategoryEntity(name = "Education", colorHex = "#2563EB", iconName = "school"),
+                CategoryEntity(name = "Fuel", colorHex = "#EA580C", iconName = "local_gas_station"),
+                CategoryEntity(name = "Insurance", colorHex = "#4338CA", iconName = "shield"),
+                CategoryEntity(name = "Gifts & Donations", colorHex = "#DB2777", iconName = "card_giftcard"),
                 CategoryEntity(name = "Other", colorHex = "#607D8B", iconName = "more_horiz")
             )
             db.categoryDao().insertAll(defaultCategories)
@@ -111,7 +164,19 @@ abstract class SpendDatabase : RoomDatabase() {
                 CategoryRuleEntity(keyword = "zepto", category = "Groceries", priority = 7),
                 CategoryRuleEntity(keyword = "instamart", category = "Groceries", priority = 8),
                 CategoryRuleEntity(keyword = "amazon", category = "Shopping", priority = 9),
-                CategoryRuleEntity(keyword = "flipkart", category = "Shopping", priority = 10)
+                CategoryRuleEntity(keyword = "flipkart", category = "Shopping", priority = 10),
+                CategoryRuleEntity(keyword = "netflix", category = "Subscriptions", priority = 11),
+                CategoryRuleEntity(keyword = "spotify", category = "Subscriptions", priority = 12),
+                CategoryRuleEntity(keyword = "hotstar", category = "Subscriptions", priority = 13),
+                CategoryRuleEntity(keyword = "prime", category = "Subscriptions", priority = 14),
+                CategoryRuleEntity(keyword = "youtube", category = "Subscriptions", priority = 15),
+                CategoryRuleEntity(keyword = "zerodha", category = "Investments", priority = 16),
+                CategoryRuleEntity(keyword = "groww", category = "Investments", priority = 17),
+                CategoryRuleEntity(keyword = "petrol", category = "Fuel", priority = 18),
+                CategoryRuleEntity(keyword = "fuel", category = "Fuel", priority = 19),
+                CategoryRuleEntity(keyword = "hpcl", category = "Fuel", priority = 20),
+                CategoryRuleEntity(keyword = "bpcl", category = "Fuel", priority = 21),
+                CategoryRuleEntity(keyword = "iocl", category = "Fuel", priority = 22)
             )
             db.categoryRuleDao().insertAll(initialRules)
         }
