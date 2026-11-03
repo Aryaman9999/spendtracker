@@ -5,15 +5,14 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="12dp"
-    android:background="@drawable/widget_background"
-    android:clipToPadding="false">
+    android:padding="14dp"
+    android:background="@drawable/widget_background">
 
     <!-- Header Row -->
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp">
+        android:layout_marginBottom="6dp">
 
         <TextView
             android:id="@+id/widget_title"
@@ -28,15 +27,14 @@
 
         <ImageButton
             android:id="@+id/widget_refresh_button"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:layout_alignParentEnd="true"
             android:layout_centerVertical="true"
             android:background="@android:color/transparent"
             android:contentDescription="Refresh"
-            android:src="@android:drawable/stat_notify_sync"
-            android:scaleType="fitCenter"
-            android:tint="#B3FFFFFF" />
+            android:src="@drawable/ic_refresh"
+            android:scaleType="centerInside" />
 
     </RelativeLayout>
 
@@ -56,14 +54,14 @@
         android:textColor="#FFFFFFFF"
         android:textSize="26sp"
         android:textStyle="bold"
-        android:layout_marginBottom="4dp" />
+        android:layout_marginBottom="2dp" />
 
     <!-- Month's Spend -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginBottom="10dp">
+        android:layout_marginBottom="8dp">
 
         <TextView
             android:layout_width="wrap_content"
@@ -83,8 +81,8 @@
 
     </LinearLayout>
 
-    <!-- Divider -->
-    <View
+    <!-- Divider (FrameLayout is guaranteed safe in RemoteViews) -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#33FFFFFF"
@@ -94,11 +92,10 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Recent"
-        android:textColor="#B3FFFFFF"
+        android:text="RECENT"
+        android:textColor="#80FFFFFF"
         android:textSize="10sp"
-        android:textAllCaps="true"
-        android:letterSpacing="0.1"
+        android:textStyle="bold"
         android:layout_marginBottom="4dp" />
 
     <!-- Transaction 1 -->
@@ -107,8 +104,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="3dp"
-        android:paddingBottom="3dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
         android:visibility="gone">
 
         <TextView
@@ -137,8 +134,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="3dp"
-        android:paddingBottom="3dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
         android:visibility="gone">
 
         <TextView
@@ -167,8 +164,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="3dp"
-        android:paddingBottom="3dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
         android:visibility="gone">
 
         <TextView

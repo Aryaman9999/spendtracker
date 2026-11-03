@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
 import com.aryaman.spendtracker.R
@@ -14,7 +15,6 @@ import com.aryaman.spendtracker.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
 import java.util.Calendar
 import java.util.Locale
 
@@ -44,6 +44,7 @@ class SpendWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
+        private const val TAG = "SpendWidget"
         const val ACTION_REFRESH = "com.aryaman.spendtracker.WIDGET_REFRESH"
 
         private fun updateWidget(
@@ -51,38 +52,31 @@ class SpendWidgetProvider : AppWidgetProvider() {
             appWidgetManager: AppWidgetManager,
             appWidgetId: Int
         ) {
-            val views = RemoteViews(context.packageName, R.layout.widget_spend_tracker)
-
-            // Tap widget body → open app
-            val openAppIntent = Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
-            val openAppPendingIntent = PendingIntent.getActivity(
-                context, 0, openAppIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widget_root, openAppPendingIntent)
-
-            // Refresh button
-            val refreshIntent = Intent(context, SpendWidgetProvider::class.java).apply {
-                action = ACTION_REFRESH
-            }
-            val refreshPendingIntent = PendingIntent.getBroadcast(
-                context, 1, refreshIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widget_refresh_button, refreshPendingIntent)
-
-            // Show loading state
-            views.setTextViewText(R.id.widget_today_amount, "...")
-            views.setTextViewText(R.id.widget_month_amount, "...")
-            appWidgetManager.updateAppWidget(appWidgetId, views)
-
-            // Fetch data asynchronously
             CoroutineScope(Dispatchers.IO).launch {
                 try {
+                    val views = RemoteViews(context.packageName, R.layout.widget_spend_tracker)
+
+                    // Tap widget body → open app
+                    val openAppIntent = Intent(context, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    }
+                    val openAppPendingIntent = PendingIntent.getActivity(
+                        context, 0, openAppIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    views.setOnClickPendingIntent(R.id.widget_root, openAppPendingIntent)
+
+                    // Refresh button
+                    val refreshIntent = Intent(context, SpendWidgetProvider::class.java).apply {
+                        action = ACTION_REFRESH
+                    }
+                    val refreshPendingIntent = PendingIntent.getBroadcast(
+                        context, 1, refreshIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    views.setOnClickPendingIntent(R.id.widget_refresh_button, refreshPendingIntent)
+
                     val dao = SpendDatabase.getInstance(context).transactionDao()
-                    val formatter = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
 
                     // — Today's spend —
                     val todayCal = Calendar.getInstance().apply {
@@ -111,8 +105,14 @@ class SpendWidgetProvider : AppWidgetProvider() {
                     val recentTxns = dao.getRecentDebitsSync(3)
 
                     // Populate amounts
-                    views.setTextViewText(R.id.widget_today_amount, formatter.format(todaySpend))
-                    views.setTextViewText(R.id.widget_month_amount, formatter.format(monthSpend))
+                    views.setTextViewText(
+                        R.id.widget_today_amount,
+                        String.format(Locale.getDefault(), "₹%.0f", todaySpend)
+                    )
+                    views.setTextViewText(
+                        R.id.widget_month_amount,
+                        String.format(Locale.getDefault(), "₹%.0f", monthSpend)
+                    )
 
                     // Transaction rows
                     val rowIds = listOf(
@@ -130,7 +130,10 @@ class SpendWidgetProvider : AppWidgetProvider() {
                                 ?: txn.category
                                 ?: "Transaction"
                             views.setTextViewText(descId, label.take(20))
-                            views.setTextViewText(amountId, formatter.format(txn.myActualShare))
+                            views.setTextViewText(
+                                amountId,
+                                String.format(Locale.getDefault(), "-₹%.0f", txn.myActualShare)
+                            )
                             views.setViewVisibility(rowId, View.VISIBLE)
                         } else {
                             views.setViewVisibility(rowId, View.GONE)
@@ -145,9 +148,13 @@ class SpendWidgetProvider : AppWidgetProvider() {
 
                     appWidgetManager.updateAppWidget(appWidgetId, views)
                 } catch (e: Exception) {
-                    views.setTextViewText(R.id.widget_today_amount, "₹0")
-                    views.setTextViewText(R.id.widget_month_amount, "₹0")
-                    appWidgetManager.updateAppWidget(appWidgetId, views)
+                    Log.e(TAG, "Failed to update widget $appWidgetId", e)
+                    try {
+                        val fallback = RemoteViews(context.packageName, R.layout.widget_spend_tracker)
+                        fallback.setTextViewText(R.id.widget_today_amount, "₹0")
+                        fallback.setTextViewText(R.id.widget_month_amount, "₹0")
+                        appWidgetManager.updateAppWidget(appWidgetId, fallback)
+                    } catch (_: Exception) {}
                 }
             }
         }
