@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">SpendTracker</string>
+    <string name="widget_description">Shows today\'s and monthly spend with recent transactions</string>
 </resources>

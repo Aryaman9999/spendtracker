@@ -6,6 +6,7 @@ import com.aryaman.spendtracker.SpendTrackerApp
 import com.aryaman.spendtracker.data.parser.UpiNotificationParser
 import com.aryaman.spendtracker.data.repository.TransactionProcessResult
 import com.aryaman.spendtracker.receiver.NotificationHelper
+import com.aryaman.spendtracker.widget.SpendWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -44,6 +45,11 @@ class UpiNotificationListenerService : NotificationListenerService() {
                     amount = parsed.amount,
                     merchant = parsed.cleanMerchant
                 )
+            }
+
+            // Refresh home screen widget after new transaction
+            if (result is TransactionProcessResult.Inserted) {
+                SpendWidgetProvider.refreshAllWidgets(applicationContext)
             }
         }
     }

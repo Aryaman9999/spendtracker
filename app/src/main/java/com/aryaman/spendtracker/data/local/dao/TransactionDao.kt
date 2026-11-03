@@ -73,6 +73,24 @@ interface TransactionDao {
     """)
     fun getTotalSpendInWindow(startTimestamp: Long, endTimestamp: Long): Flow<Double?>
 
+    /** Synchronous version for widget updates (runs on IO thread). */
+    @Query("""
+        SELECT SUM(myActualShare) 
+        FROM transactions 
+        WHERE direction = 'DEBIT' 
+          AND timestampMillis BETWEEN :startTimestamp AND :endTimestamp
+    """)
+    suspend fun getTotalSpendInWindowSync(startTimestamp: Long, endTimestamp: Long): Double?
+
+    /** Get the N most recent DEBIT transactions, synchronously (for widget). */
+    @Query("""
+        SELECT * FROM transactions 
+        WHERE direction = 'DEBIT' 
+        ORDER BY timestampMillis DESC 
+        LIMIT :limit
+    """)
+    suspend fun getRecentDebitsSync(limit: Int): List<TransactionEntity>
+
     @Query("UPDATE transactions SET comment = :comment WHERE id = :id")
     suspend fun updateComment(id: Long, comment: String?)
 

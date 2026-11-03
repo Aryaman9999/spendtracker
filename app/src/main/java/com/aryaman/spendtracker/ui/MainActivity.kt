@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.aryaman.spendtracker.SpendTrackerApp
+import com.aryaman.spendtracker.widget.SpendWidgetProvider
 import com.aryaman.spendtracker.ui.screens.*
 import com.aryaman.spendtracker.ui.theme.SpendTrackerTheme
 import kotlinx.coroutines.CoroutineScope
@@ -383,5 +384,10 @@ class MainActivity : ComponentActivity() {
         if (missing.isNotEmpty()) {
             requestPermissionsLauncher.launch(missing.toTypedArray())
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        SpendWidgetProvider.refreshAllWidgets(this)
     }
 }

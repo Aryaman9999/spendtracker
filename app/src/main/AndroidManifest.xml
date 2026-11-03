@@ -47,6 +47,20 @@
             android:name=".receiver.NotificationActionReceiver"
             android:exported="false" />
 
+        <!-- Home Screen Widget -->
+        <receiver
+            android:name=".widget.SpendWidgetProvider"
+            android:exported="true"
+            android:label="Spend Tracker">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.aryaman.spendtracker.WIDGET_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/spend_widget_info" />
+        </receiver>
+
         <!-- NotificationListenerService for UPI Apps (GPay, PhonePe, Paytm) -->
         <service
             android:name=".service.UpiNotificationListenerService"

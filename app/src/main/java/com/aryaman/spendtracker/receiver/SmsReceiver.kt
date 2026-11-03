@@ -9,6 +9,7 @@ import com.aryaman.spendtracker.data.parser.DynamicTemplateParser
 import com.aryaman.spendtracker.data.parser.HdfcSmsParser
 import com.aryaman.spendtracker.data.parser.SbiSmsParser
 import com.aryaman.spendtracker.data.repository.TransactionProcessResult
+import com.aryaman.spendtracker.widget.SpendWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,6 +61,11 @@ class SmsReceiver : BroadcastReceiver() {
                         amount = parsed.amount,
                         merchant = parsed.cleanMerchant
                     )
+                }
+
+                // Refresh home screen widget after new transaction
+                if (result is TransactionProcessResult.Inserted) {
+                    SpendWidgetProvider.refreshAllWidgets(context)
                 }
             } finally {
                 pendingResult.finish()

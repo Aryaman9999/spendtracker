@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
 import com.aryaman.spendtracker.SpendTrackerApp
+import com.aryaman.spendtracker.widget.SpendWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,6 +28,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         category = category,
                         createRuleKeyword = merchant
                     )
+                    SpendWidgetProvider.refreshAllWidgets(context)
                 }
 
                 // Dismiss the notification
@@ -38,6 +40,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 val repository = (context.applicationContext as SpendTrackerApp).repository
                 CoroutineScope(Dispatchers.IO).launch {
                     repository.toggleQuickSplit(txnId)
+                    SpendWidgetProvider.refreshAllWidgets(context)
                 }
                 NotificationManagerCompat.from(context).cancel(txnId.toInt())
             }
