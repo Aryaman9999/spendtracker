@@ -65,6 +65,36 @@ interface TransactionDao {
     """)
     fun getSpendByCategory(startTimestamp: Long, endTimestamp: Long): Flow<List<CategorySpendSummary>>
 
+    /**
+     * Category spend specifically counting toward budget (excludes transactions marked isBudgetExempt).
+     */
+    @Query("""
+        SELECT category, SUM(myActualShare) as totalAmount 
+        FROM transactions 
+        WHERE direction = 'DEBIT' 
+          AND timestampMillis BETWEEN :startTimestamp AND :endTimestamp 
+          AND category IS NOT NULL
+          AND isBudgetExempt = 0
+        GROUP BY category 
+        ORDER BY totalAmount DESC
+    """)
+    fun getBudgetSpendByCategory(startTimestamp: Long, endTimestamp: Long): Flow<List<CategorySpendSummary>>
+
+    /**
+     * Top categories in time window synchronously, for the homescreen widget.
+     */
+    @Query("""
+        SELECT category, SUM(myActualShare) as totalAmount 
+        FROM transactions 
+        WHERE direction = 'DEBIT' 
+          AND timestampMillis BETWEEN :startTimestamp AND :endTimestamp 
+          AND category IS NOT NULL
+        GROUP BY category 
+        ORDER BY totalAmount DESC 
+        LIMIT :limit
+    """)
+    suspend fun getTopCategoriesInWindowSync(startTimestamp: Long, endTimestamp: Long, limit: Int = 5): List<CategorySpendSummary>
+
     @Query("""
         SELECT SUM(myActualShare) 
         FROM transactions 
@@ -93,6 +123,12 @@ interface TransactionDao {
 
     @Query("UPDATE transactions SET comment = :comment WHERE id = :id")
     suspend fun updateComment(id: Long, comment: String?)
+
+    @Query("UPDATE transactions SET isCreditCard = :isCreditCard WHERE id = :id")
+    suspend fun updateCreditCard(id: Long, isCreditCard: Boolean)
+
+    @Query("UPDATE transactions SET isBudgetExempt = :exempt WHERE id = :id")
+    suspend fun updateBudgetExempt(id: Long, exempt: Boolean)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(transaction: TransactionEntity): Long

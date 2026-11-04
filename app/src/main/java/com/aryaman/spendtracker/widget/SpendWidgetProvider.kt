@@ -101,10 +101,10 @@ class SpendWidgetProvider : AppWidgetProvider() {
                     val monthEnd = System.currentTimeMillis()
                     val monthSpend = dao.getTotalSpendInWindowSync(monthStart, monthEnd) ?: 0.0
 
-                    // — Recent 3 debits —
-                    val recentTxns = dao.getRecentDebitsSync(3)
+                    // — Top 5 categories for current month —
+                    val topCategories = dao.getTopCategoriesInWindowSync(monthStart, monthEnd, 5)
 
-                    // Populate amounts
+                    // Populate today and month amounts
                     views.setTextViewText(
                         R.id.widget_today_amount,
                         String.format(Locale.getDefault(), "₹%.0f", todaySpend)
@@ -114,25 +114,23 @@ class SpendWidgetProvider : AppWidgetProvider() {
                         String.format(Locale.getDefault(), "₹%.0f", monthSpend)
                     )
 
-                    // Transaction rows
-                    val rowIds = listOf(
-                        Triple(R.id.widget_txn1_row, R.id.widget_txn1_desc, R.id.widget_txn1_amount),
-                        Triple(R.id.widget_txn2_row, R.id.widget_txn2_desc, R.id.widget_txn2_amount),
-                        Triple(R.id.widget_txn3_row, R.id.widget_txn3_desc, R.id.widget_txn3_amount),
+                    // Category rows (up to 5)
+                    val catRowIds = listOf(
+                        Triple(R.id.widget_cat1_row, R.id.widget_cat1_name, R.id.widget_cat1_amount),
+                        Triple(R.id.widget_cat2_row, R.id.widget_cat2_name, R.id.widget_cat2_amount),
+                        Triple(R.id.widget_cat3_row, R.id.widget_cat3_name, R.id.widget_cat3_amount),
+                        Triple(R.id.widget_cat4_row, R.id.widget_cat4_name, R.id.widget_cat4_amount),
+                        Triple(R.id.widget_cat5_row, R.id.widget_cat5_name, R.id.widget_cat5_amount),
                     )
 
-                    for (i in rowIds.indices) {
-                        val (rowId, descId, amountId) = rowIds[i]
-                        if (i < recentTxns.size) {
-                            val txn = recentTxns[i]
-                            val label = txn.cleanMerchant
-                                ?: txn.merchantText?.take(20)
-                                ?: txn.category
-                                ?: "Transaction"
-                            views.setTextViewText(descId, label.take(20))
+                    for (i in catRowIds.indices) {
+                        val (rowId, nameId, amountId) = catRowIds[i]
+                        if (i < topCategories.size) {
+                            val cat = topCategories[i]
+                            views.setTextViewText(nameId, cat.category.take(24))
                             views.setTextViewText(
                                 amountId,
-                                String.format(Locale.getDefault(), "-₹%.0f", txn.myActualShare)
+                                String.format(Locale.getDefault(), "₹%.0f", cat.totalAmount)
                             )
                             views.setViewVisibility(rowId, View.VISIBLE)
                         } else {
@@ -140,10 +138,10 @@ class SpendWidgetProvider : AppWidgetProvider() {
                         }
                     }
 
-                    // No transactions message
+                    // Empty categories state
                     views.setViewVisibility(
-                        R.id.widget_no_txns,
-                        if (recentTxns.isEmpty()) View.VISIBLE else View.GONE
+                        R.id.widget_no_cats,
+                        if (topCategories.isEmpty()) View.VISIBLE else View.GONE
                     )
 
                     appWidgetManager.updateAppWidget(appWidgetId, views)
@@ -159,10 +157,6 @@ class SpendWidgetProvider : AppWidgetProvider() {
             }
         }
 
-        /**
-         * Call this from SmsReceiver / UpiNotificationListenerService after a
-         * new transaction is inserted to immediately refresh all widgets.
-         */
         fun refreshAllWidgets(context: Context) {
             val intent = Intent(context, SpendWidgetProvider::class.java).apply {
                 action = ACTION_REFRESH

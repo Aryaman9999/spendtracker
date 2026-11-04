@@ -1,5 +1,6 @@
 package com.aryaman.spendtracker.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -7,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -26,7 +28,9 @@ import com.aryaman.spendtracker.data.local.entity.CategoryEntity
 import com.aryaman.spendtracker.data.local.entity.CategoryRuleEntity
 import com.aryaman.spendtracker.data.local.entity.SmsTemplateEntity
 import com.aryaman.spendtracker.data.model.TransactionDirection
+import com.aryaman.spendtracker.ui.components.SetCategoryBudgetDialog
 import com.aryaman.spendtracker.ui.theme.*
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,26 +43,30 @@ fun RuleManagerScreen(
     onNavigateToAddTemplate: () -> Unit = {},
     onDeleteTemplate: (SmsTemplateEntity) -> Unit = {},
     onToggleTemplateActive: (Long, Boolean) -> Unit = { _, _ -> },
+    onUpdateCategoryBudget: (categoryName: String, budget: Double?) -> Unit = { _, _ -> },
     onNavigateToColorOsGuide: () -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAddRuleDialog by remember { mutableStateOf(false) }
+    var categoryToSetBudget by remember { mutableStateOf<Pair<String, Double?>?>(null) }
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    if (selectedTab == 0) {
-                        showAddRuleDialog = true
-                    } else {
-                        onNavigateToAddTemplate()
+            if (selectedTab != 2) {
+                FloatingActionButton(
+                    onClick = {
+                        if (selectedTab == 0) {
+                            showAddRuleDialog = true
+                        } else {
+                            onNavigateToAddTemplate()
+                        }
                     }
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = if (selectedTab == 0) "Add Rule" else "Add Bank Format"
+                    )
                 }
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = if (selectedTab == 0) "Add Rule" else "Add Bank Format"
-                )
             }
         }
     ) { padding ->
@@ -107,6 +115,11 @@ fun RuleManagerScreen(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
                     text = { Text("Bank Formats (${templates.size})", fontWeight = FontWeight.SemiBold) }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("Budgets", fontWeight = FontWeight.SemiBold) }
                 )
             }
 
@@ -246,7 +259,7 @@ fun RuleManagerScreen(
                             }
                         }
                     }
-                } else {
+                } else if (selectedTab == 1) {
                     // TAB 1: Custom Bank SMS Formats
                     item {
                         Card(
@@ -423,6 +436,74 @@ fun RuleManagerScreen(
                             }
                         }
                     }
+                } else {
+                    // TAB 2: Category Budgets
+                    item {
+                        Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                            Text(
+                                text = "Monthly Category Budgets",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Set target spending caps for each category. Spending progress will be tracked on your dashboard.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    items(categories, key = { it.id }) { category ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    CategoryAvatar(category = category.name, size = 38.dp)
+                                    Spacer(Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = category.name,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = if (category.monthlyBudget != null && category.monthlyBudget > 0)
+                                                "Limit: ₹${String.format(Locale.getDefault(), "%.0f", category.monthlyBudget)}/month"
+                                            else
+                                                "No budget limit configured",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (category.monthlyBudget != null) PrimaryIndigo else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                }
+
+                                Button(
+                                    onClick = { categoryToSetBudget = category.name to category.monthlyBudget },
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text(
+                                        if (category.monthlyBudget != null) "Edit" else "+ Set Limit",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 item {
@@ -452,6 +533,18 @@ fun RuleManagerScreen(
             onAdd = { newRule ->
                 onAddRule(newRule)
                 showAddRuleDialog = false
+            }
+        )
+    }
+
+    categoryToSetBudget?.let { (catName, currentBudget) ->
+        SetCategoryBudgetDialog(
+            categoryName = catName,
+            currentBudget = currentBudget,
+            onDismiss = { categoryToSetBudget = null },
+            onSaveBudget = { newBudget ->
+                onUpdateCategoryBudget(catName, newBudget)
+                categoryToSetBudget = null
             }
         )
     }

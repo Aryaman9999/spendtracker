@@ -49,8 +49,39 @@ object HdfcSmsParser {
                 referenceNumber = refNumber,
                 timestampMillis = timestamp,
                 source = TransactionSource.SMS,
-                rawText = trimmed
+                rawText = trimmed,
+                isCreditCard = true
             )
+        }
+
+        // 2. Direct HDFC Credit Card Spend Pattern (POS, Swipes, Online E-comm)
+        // e.g. "Alert: You've spent Rs.1,500.00 on HDFC Bank Credit Card ending 1234 at AMAZON on 24-09-26..."
+        // e.g. "Thank you for using HDFC Bank Credit Card ending 1234 for Rs 550.00 at SWIGGY..."
+        val directCcRegex = Regex(
+            """(?:spent|using|spent\s+Rs\.?|paid)\s+(?:Rs\.?|INR)?\s*([\d,]+(?:\.\d{1,2})?)\s+(?:on|using|for)?\s*HDFC\s+Bank\s+(?:Credit\s+Card|Card)\s*(?:ending)?\s*\*?(\w+)?\s+(?:at|to|for|on)\s+([A-Za-z0-9\s._-]+?)(?:\s+on|\.|\s+at|\s+via|\s+Bal|$)""",
+            RegexOption.IGNORE_CASE
+        )
+        val directCcMatch = directCcRegex.find(trimmed)
+        if (directCcMatch != null) {
+            val amountStr = directCcMatch.groupValues[1].replace(",", "")
+            val cardEnding = directCcMatch.groupValues.getOrNull(2)?.trim()?.ifEmpty { null }
+            val rawMerchant = directCcMatch.groupValues.getOrNull(3)?.trim() ?: "Unknown"
+
+            val amount = amountStr.toDoubleOrNull()
+            if (amount != null) {
+                return ParsedTransaction(
+                    amount = amount,
+                    direction = TransactionDirection.DEBIT,
+                    rawMerchant = rawMerchant,
+                    cleanMerchant = cleanMerchantName(rawMerchant),
+                    accountInfo = if (cardEnding != null) "HDFC CC *$cardEnding" else "HDFC Credit Card",
+                    referenceNumber = extractReferenceNumber(trimmed),
+                    timestampMillis = smsTimestamp,
+                    source = TransactionSource.SMS,
+                    rawText = trimmed,
+                    isCreditCard = true
+                )
+            }
         }
 
         // 2. Multi-line Account UPI Debit pattern
@@ -127,16 +158,21 @@ object HdfcSmsParser {
 
             val amount = amountStr.toDoubleOrNull() ?: return null
 
+            val isCc = trimmed.contains("credit card", ignoreCase = true) ||
+                       trimmed.contains("pixel play", ignoreCase = true) ||
+                       trimmed.contains("card ending", ignoreCase = true)
+
             return ParsedTransaction(
                 amount = amount,
                 direction = TransactionDirection.DEBIT,
                 rawMerchant = rawMerchant,
                 cleanMerchant = cleanMerchantName(rawMerchant),
-                accountInfo = acctNumber?.let { "HDFC *$it" },
+                accountInfo = if (isCc) (acctNumber?.let { "HDFC CC *$it" } ?: "HDFC Credit Card") else acctNumber?.let { "HDFC *$it" },
                 referenceNumber = extractReferenceNumber(trimmed),
                 timestampMillis = smsTimestamp,
                 source = TransactionSource.SMS,
-                rawText = trimmed
+                rawText = trimmed,
+                isCreditCard = isCc
             )
         }
 

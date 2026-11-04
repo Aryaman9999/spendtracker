@@ -91,6 +91,15 @@ class TransactionRepository(
             Triple(TransactionStatus.PENDING_REVIEW, null, null)
         }
 
+        val isCc = parsed.isCreditCard ||
+            parsed.rawText.contains("credit card", ignoreCase = true) ||
+            parsed.rawText.contains("pixel play", ignoreCase = true) ||
+            parsed.rawText.contains("hdfc card", ignoreCase = true) ||
+            parsed.rawText.contains("card ending", ignoreCase = true) ||
+            parsed.accountInfo?.contains("Credit Card", ignoreCase = true) == true ||
+            parsed.accountInfo?.contains("Pixel", ignoreCase = true) == true ||
+            parsed.accountInfo?.contains("CC", ignoreCase = true) == true
+
         val newEntity = TransactionEntity(
             timestampMillis = parsed.timestampMillis,
             source = parsed.source,
@@ -104,7 +113,9 @@ class TransactionRepository(
             status = status,
             ruleIdApplied = ruleId,
             referenceNumber = parsed.referenceNumber,
-            accountInfo = parsed.accountInfo
+            accountInfo = parsed.accountInfo,
+            isCreditCard = isCc,
+            isBudgetExempt = false
         )
 
         val newId = transactionDao.insert(newEntity)
@@ -222,6 +233,25 @@ class TransactionRepository(
 
     suspend fun deleteTransaction(id: Long) = transactionDao.deleteById(id)
 
+    suspend fun toggleCreditCard(transactionId: Long): Boolean {
+        val transaction = transactionDao.getTransactionById(transactionId) ?: return false
+        val newStatus = !transaction.isCreditCard
+        transactionDao.updateCreditCard(transactionId, newStatus)
+        return newStatus
+    }
+
+    suspend fun toggleBudgetExempt(transactionId: Long): Boolean {
+        val transaction = transactionDao.getTransactionById(transactionId) ?: return false
+        val newStatus = !transaction.isBudgetExempt
+        transactionDao.updateBudgetExempt(transactionId, newStatus)
+        return newStatus
+    }
+
+    suspend fun updateCategoryBudget(categoryName: String, budget: Double?) {
+        categoryDao.updateMonthlyBudgetByName(categoryName, budget)
+    }
+
+    fun getBudgetSpendByCategory(start: Long, end: Long) = transactionDao.getBudgetSpendByCategory(start, end)
     fun getSpendByCategory(start: Long, end: Long) = transactionDao.getSpendByCategory(start, end)
     fun getTotalSpend(start: Long, end: Long) = transactionDao.getTotalSpendInWindow(start, end)
 }

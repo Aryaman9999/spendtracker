@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
         CategoryEntity::class,
         SmsTemplateEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -107,6 +107,31 @@ abstract class SpendDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Add isCreditCard and isBudgetExempt to transactions table
+                db.execSQL("ALTER TABLE transactions ADD COLUMN isCreditCard INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE transactions ADD COLUMN isBudgetExempt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_isCreditCard` ON transactions (`isCreditCard`)")
+
+                // 2. Add monthlyBudget to categories table
+                db.execSQL("ALTER TABLE categories ADD COLUMN monthlyBudget REAL DEFAULT NULL")
+
+                // 3. Retroactively flag past HDFC Credit Card transactions
+                db.execSQL("""
+                    UPDATE transactions 
+                    SET isCreditCard = 1 
+                    WHERE rawText LIKE '%credit card%' 
+                       OR rawText LIKE '%pixel play%' 
+                       OR rawText LIKE '%HDFC Bank Card%' 
+                       OR rawText LIKE '%Card ending%' 
+                       OR rawText LIKE '%CC ending%' 
+                       OR accountInfo LIKE '%Credit Card%' 
+                       OR accountInfo LIKE '%Pixel%'
+                """.trimIndent())
+            }
+        }
+
         fun getInstance(context: Context): SpendDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -124,7 +149,7 @@ abstract class SpendDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

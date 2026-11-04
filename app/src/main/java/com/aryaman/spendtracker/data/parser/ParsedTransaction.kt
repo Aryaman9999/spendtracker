@@ -16,5 +16,6 @@ data class ParsedTransaction(
     val referenceNumber: String? = null,
     val timestampMillis: Long = System.currentTimeMillis(),
     val source: TransactionSource = TransactionSource.SMS,
-    val rawText: String
+    val rawText: String,
+    val isCreditCard: Boolean = false
 )

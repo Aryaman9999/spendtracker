@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,9 +34,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aryaman.spendtracker.data.local.dao.CategorySpendSummary
 import com.aryaman.spendtracker.data.local.dao.RoommateBalance
+import com.aryaman.spendtracker.data.local.entity.CategoryEntity
 import com.aryaman.spendtracker.data.local.entity.TransactionEntity
 import com.aryaman.spendtracker.data.model.TransactionDirection
 import com.aryaman.spendtracker.ui.PeriodType
+import com.aryaman.spendtracker.ui.components.SetCategoryBudgetDialog
 import com.aryaman.spendtracker.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -53,6 +57,7 @@ fun DashboardScreen(
     transactions: List<TransactionEntity>,
     categorySpends: List<CategorySpendSummary>,
     roommateBalances: List<RoommateBalance>,
+    categories: List<CategoryEntity> = emptyList(),
     pendingCount: Int,
     periodType: PeriodType,
     periodLabel: String,
@@ -63,7 +68,8 @@ fun DashboardScreen(
     onNextPeriod: () -> Unit,
     onResetToCurrentPeriod: () -> Unit,
     onNavigateToTransactions: (filterPending: Boolean, categoryFilter: String?) -> Unit,
-    onNavigateToSplits: () -> Unit
+    onNavigateToSplits: () -> Unit,
+    onUpdateCategoryBudget: (categoryName: String, budget: Double?) -> Unit = { _, _ -> }
 ) {
     val totalSpend = categorySpends.sumOf { it.totalAmount }
     val totalOwedByRoommates = roommateBalances.sumOf { it.totalUnsettled }
@@ -434,6 +440,9 @@ fun DashboardScreen(
                 categorySpends = categorySpends,
                 totalSpend = totalSpend,
                 periodLabel = periodLabel,
+                categories = categories,
+                transactions = transactions,
+                onUpdateCategoryBudget = onUpdateCategoryBudget,
                 onCategoryClick = { category ->
                     onNavigateToTransactions(false, category)
                 }
@@ -726,15 +735,32 @@ fun RoommateOwedQuickCard(
 }
 
 /**
- * Graphical Spending Analysis Section.
+ * Graphical Spending Analysis Section with Category Budget Limits & Exemption Support.
  */
 @Composable
 fun SpendingAnalyticsCard(
     categorySpends: List<CategorySpendSummary>,
     totalSpend: Double,
     periodLabel: String,
+    categories: List<CategoryEntity> = emptyList(),
+    transactions: List<TransactionEntity> = emptyList(),
+    onUpdateCategoryBudget: (categoryName: String, budget: Double?) -> Unit = { _, _ -> },
     onCategoryClick: (String) -> Unit
 ) {
+    var categoryToSetBudget by remember { mutableStateOf<Pair<String, Double?>?>(null) }
+
+    categoryToSetBudget?.let { (catName, currentBudget) ->
+        SetCategoryBudgetDialog(
+            categoryName = catName,
+            currentBudget = currentBudget,
+            onDismiss = { categoryToSetBudget = null },
+            onSaveBudget = { newBudget ->
+                onUpdateCategoryBudget(catName, newBudget)
+                categoryToSetBudget = null
+            }
+        )
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -799,10 +825,28 @@ fun SpendingAnalyticsCard(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                 Spacer(Modifier.height(6.dp))
 
-                // Compact Category List Rows with Real Vector Icons
+                // Compact Category List Rows with Real Vector Icons & Budget Progress
                 categorySpends.forEachIndexed { index, cat ->
                     val percentage = if (totalSpend > 0) (cat.totalAmount / totalSpend).toFloat() else 0f
                     val catColor = getCategoryColor(cat.category)
+
+                    // Find configured budget for this category
+                    val catEntity = categories.find { it.name.equals(cat.category, ignoreCase = true) }
+                    val monthlyBudget = catEntity?.monthlyBudget
+
+                    // Calculate spend strictly counted against budget (excluding transactions with isBudgetExempt)
+                    val budgetedAmount = remember(transactions, cat.category) {
+                        transactions.filter {
+                            it.direction == TransactionDirection.DEBIT &&
+                            it.category.equals(cat.category, ignoreCase = true) &&
+                            !it.isBudgetExempt
+                        }.sumOf { it.myActualShare }
+                    }
+                    val exemptAmount = cat.totalAmount - budgetedAmount
+
+                    val hasBudget = monthlyBudget != null && monthlyBudget > 0
+                    val budgetRatio = if (hasBudget) (budgetedAmount / monthlyBudget!!).toFloat() else 0f
+                    val isOverBudget = hasBudget && budgetedAmount > monthlyBudget!!
 
                     Row(
                         modifier = Modifier
@@ -817,20 +861,34 @@ fun SpendingAnalyticsCard(
                             CategoryAvatar(category = cat.category, size = 36.dp)
                             Spacer(Modifier.width(10.dp))
                             Column {
-                                Text(
-                                    text = cat.category,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(Modifier.height(2.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = cat.category,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    IconButton(
+                                        onClick = { categoryToSetBudget = cat.category to monthlyBudget },
+                                        modifier = Modifier.size(20.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.AccountBalanceWallet,
+                                            contentDescription = "Set Budget",
+                                            tint = if (hasBudget) PrimaryIndigo else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.height(3.dp))
                                 LinearProgressIndicator(
-                                    progress = { percentage },
+                                    progress = { if (hasBudget) budgetRatio.coerceIn(0f, 1f) else percentage },
                                     modifier = Modifier
-                                        .width(100.dp)
+                                        .width(110.dp)
                                         .height(4.dp)
                                         .clip(RoundedCornerShape(2.dp)),
-                                    color = catColor,
+                                    color = if (isOverBudget) RoseDebitDark else catColor,
                                     trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
                                 )
                             }
@@ -838,18 +896,50 @@ fun SpendingAnalyticsCard(
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = String.format(Locale.getDefault(), "₹%.2f", cat.totalAmount),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = String.format(Locale.getDefault(), "%.0f%%", percentage * 100),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = catColor
-                                )
+                                if (hasBudget) {
+                                    Text(
+                                        text = "₹${String.format(Locale.getDefault(), "%.0f", budgetedAmount)} / ₹${String.format(Locale.getDefault(), "%.0f", monthlyBudget)}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isOverBudget) RoseDebitDark else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (isOverBudget) {
+                                        Text(
+                                            text = "Over by ₹${String.format(Locale.getDefault(), "%.0f", budgetedAmount - monthlyBudget)}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = RoseDebitDark
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "${(budgetRatio * 100).toInt()}% • ₹${String.format(Locale.getDefault(), "%.0f", monthlyBudget - budgetedAmount)} left",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = catColor
+                                        )
+                                    }
+                                } else {
+                                    Text(
+                                        text = String.format(Locale.getDefault(), "₹%.2f", cat.totalAmount),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = String.format(Locale.getDefault(), "%.0f%% of total", percentage * 100),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = catColor
+                                    )
+                                }
+                                if (exemptAmount > 0) {
+                                    Text(
+                                        text = "(₹${String.format(Locale.getDefault(), "%.0f", exemptAmount)} off-budget)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 9.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                                    )
+                                }
                             }
                             Spacer(Modifier.width(6.dp))
                             Icon(

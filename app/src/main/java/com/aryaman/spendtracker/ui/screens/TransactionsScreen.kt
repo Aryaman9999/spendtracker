@@ -20,11 +20,14 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,6 +46,7 @@ import java.util.Locale
 
 enum class TransactionFilter {
     ALL,
+    CREDIT_CARD,
     PENDING,
     AUTO_MATCHED,
     SPLIT
@@ -60,6 +64,8 @@ fun TransactionsScreen(
     onCategorize: (id: Long, category: String, createRule: Boolean) -> Unit,
     onSplit: (id: Long, myActualShare: Double, splits: List<SplitEntryEntity>) -> Unit,
     onToggleSplit: (id: Long) -> Unit = {},
+    onToggleCreditCard: (id: Long) -> Unit = {},
+    onToggleBudgetExempt: (id: Long) -> Unit = {},
     onUpdateComment: (id: Long, comment: String?) -> Unit = { _, _ -> },
     onDelete: (id: Long) -> Unit
 ) {
@@ -76,6 +82,7 @@ fun TransactionsScreen(
     val filteredList = remember(transactions, selectedFilter, selectedCategoryFilter) {
         val base = when (selectedFilter) {
             TransactionFilter.ALL -> transactions
+            TransactionFilter.CREDIT_CARD -> transactions.filter { it.isCreditCard }
             TransactionFilter.PENDING -> transactions.filter { it.status == TransactionStatus.PENDING_REVIEW }
             TransactionFilter.AUTO_MATCHED -> transactions.filter { it.status == TransactionStatus.AUTO_MATCHED }
             TransactionFilter.SPLIT -> transactions.filter { it.myActualShare != it.amount }
@@ -187,6 +194,18 @@ fun TransactionsScreen(
                     )
                 }
                 item {
+                    val ccCount = transactions.count { it.isCreditCard }
+                    FilterChip(
+                        selected = selectedFilter == TransactionFilter.CREDIT_CARD,
+                        onClick = { selectedFilter = TransactionFilter.CREDIT_CARD },
+                        label = { Text("HDFC CC ($ccCount)") },
+                        leadingIcon = {
+                            Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(13.dp))
+                        },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+                item {
                     val pendingCount = transactions.count { it.status == TransactionStatus.PENDING_REVIEW }
                     FilterChip(
                         selected = selectedFilter == TransactionFilter.PENDING,
@@ -262,6 +281,8 @@ fun TransactionsScreen(
                             onOpenCategoryPicker = { transactionToCategorize = txn },
                             onOpenSplitDialog = { transactionToSplit = txn },
                             onToggleSplit = { onToggleSplit(txn.id) },
+                            onToggleCreditCard = { onToggleCreditCard(txn.id) },
+                            onToggleBudgetExempt = { onToggleBudgetExempt(txn.id) },
                             onUpdateComment = { comment -> onUpdateComment(txn.id, comment) },
                             onDelete = { onDelete(txn.id) }
                         )
@@ -308,6 +329,8 @@ fun TransactionDetailCard(
     onOpenCategoryPicker: () -> Unit,
     onOpenSplitDialog: () -> Unit,
     onToggleSplit: () -> Unit,
+    onToggleCreditCard: () -> Unit = {},
+    onToggleBudgetExempt: () -> Unit = {},
     onUpdateComment: (String?) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -396,34 +419,85 @@ fun TransactionDetailCard(
 
                 Spacer(Modifier.width(8.dp))
 
-                // Amount & Direct Split Tag
+                // Amount & Tags
                 Column(horizontalAlignment = Alignment.End) {
-                    // Direct Split Tag: 1-tap toggle to categorize spend as split or not!
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (isSplit) PrimaryIndigo.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = if (isSplit) BorderStroke(0.8.dp, PrimaryIndigo.copy(alpha = 0.35f)) else null,
-                        onClick = onToggleSplit,
+                    // Row of Badges (HDFC CC, Off-Budget, Split)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(bottom = 3.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        if (transaction.isCreditCard) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFF673AB7).copy(alpha = 0.18f),
+                                border = BorderStroke(0.8.dp, Color(0xFF9575CD).copy(alpha = 0.45f))
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CreditCard,
+                                        contentDescription = "HDFC CC",
+                                        tint = Color(0xFFB39DDB),
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Spacer(Modifier.width(2.dp))
+                                    Text(
+                                        text = "CC",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFFD1C4E9),
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 9.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        if (transaction.isBudgetExempt) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = "Off-Budget",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 9.sp,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        // Direct Split Tag: 1-tap toggle to categorize spend as split or not!
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isSplit) PrimaryIndigo.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = if (isSplit) BorderStroke(0.8.dp, PrimaryIndigo.copy(alpha = 0.35f)) else null,
+                            onClick = onToggleSplit
                         ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.CallSplit,
-                                contentDescription = if (isSplit) "Split Spend (Tap to un-split)" else "Mark as Split Spend",
-                                tint = if (isSplit) PrimaryIndigoDark else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                modifier = Modifier.size(11.dp)
-                            )
-                            Spacer(Modifier.width(3.dp))
-                            Text(
-                                text = if (isSplit) "Split" else "+ Split",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isSplit) PrimaryIndigoDark else MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = if (isSplit) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 10.sp
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.CallSplit,
+                                    contentDescription = if (isSplit) "Split Spend" else "Mark as Split Spend",
+                                    tint = if (isSplit) PrimaryIndigoDark else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(10.dp)
+                                )
+                                Spacer(Modifier.width(2.dp))
+                                Text(
+                                    text = if (isSplit) "Split" else "+ Split",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSplit) PrimaryIndigoDark else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = if (isSplit) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 9.sp
+                                )
+                            }
                         }
                     }
 
@@ -521,6 +595,82 @@ fun TransactionDetailCard(
                                 onClick = { if (!isSplit) onToggleSplit() },
                                 label = { Text("Split Spend", fontSize = 11.sp, fontWeight = if (isSplit) FontWeight.Bold else FontWeight.Normal) },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.CallSplit, contentDescription = null, modifier = Modifier.size(12.dp)) },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(28.dp)
+                            )
+                        }
+                    }
+
+                    // Payment Method (Credit Card toggle)
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Payment Method",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilterChip(
+                                selected = !transaction.isCreditCard,
+                                onClick = { if (transaction.isCreditCard) onToggleCreditCard() },
+                                label = { Text("Account/UPI", fontSize = 11.sp) },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(28.dp)
+                            )
+                            FilterChip(
+                                selected = transaction.isCreditCard,
+                                onClick = { if (!transaction.isCreditCard) onToggleCreditCard() },
+                                label = { Text("HDFC CC", fontSize = 11.sp, fontWeight = if (transaction.isCreditCard) FontWeight.Bold else FontWeight.Normal) },
+                                leadingIcon = { Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(12.dp)) },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(28.dp)
+                            )
+                        }
+                    }
+
+                    // Budget Exemption Selector
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Category Budget Target",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = if (transaction.isBudgetExempt)
+                                    "Exempted from category budget limit"
+                                else
+                                    "Counts towards category budget limit",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (transaction.isBudgetExempt) AmberPending else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                                fontSize = 10.sp
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilterChip(
+                                selected = !transaction.isBudgetExempt,
+                                onClick = { if (transaction.isBudgetExempt) onToggleBudgetExempt() },
+                                label = { Text("Included", fontSize = 11.sp) },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(28.dp)
+                            )
+                            FilterChip(
+                                selected = transaction.isBudgetExempt,
+                                onClick = { if (!transaction.isBudgetExempt) onToggleBudgetExempt() },
+                                label = { Text("Exempt", fontSize = 11.sp, fontWeight = if (transaction.isBudgetExempt) FontWeight.Bold else FontWeight.Normal) },
+                                leadingIcon = { Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(11.dp)) },
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.height(28.dp)
                             )

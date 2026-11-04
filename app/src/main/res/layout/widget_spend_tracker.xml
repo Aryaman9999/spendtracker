@@ -86,114 +86,174 @@
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#33FFFFFF"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="6dp" />
 
-    <!-- Recent Label -->
+    <!-- Top Categories Label -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="RECENT"
+        android:text="TOP CATEGORIES THIS MONTH"
         android:textColor="#80FFFFFF"
         android:textSize="10sp"
         android:textStyle="bold"
-        android:layout_marginBottom="4dp" />
+        android:layout_marginBottom="3dp" />
 
-    <!-- Transaction 1 -->
+    <!-- Category 1 -->
     <LinearLayout
-        android:id="@+id/widget_txn1_row"
+        android:id="@+id/widget_cat1_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="2dp"
-        android:paddingBottom="2dp"
+        android:paddingTop="1dp"
+        android:paddingBottom="1dp"
         android:visibility="gone">
 
         <TextView
-            android:id="@+id/widget_txn1_desc"
+            android:id="@+id/widget_cat1_name"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textColor="#DDFFFFFF"
+            android:textColor="#EEFFFFFF"
             android:textSize="12sp"
             android:ellipsize="end"
             android:maxLines="1" />
 
         <TextView
-            android:id="@+id/widget_txn1_amount"
+            android:id="@+id/widget_cat1_amount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#FFEF9A9A"
+            android:textColor="#FFFFFFFF"
             android:textSize="12sp"
             android:textStyle="bold" />
 
     </LinearLayout>
 
-    <!-- Transaction 2 -->
+    <!-- Category 2 -->
     <LinearLayout
-        android:id="@+id/widget_txn2_row"
+        android:id="@+id/widget_cat2_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="2dp"
-        android:paddingBottom="2dp"
+        android:paddingTop="1dp"
+        android:paddingBottom="1dp"
         android:visibility="gone">
 
         <TextView
-            android:id="@+id/widget_txn2_desc"
+            android:id="@+id/widget_cat2_name"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textColor="#DDFFFFFF"
+            android:textColor="#EEFFFFFF"
             android:textSize="12sp"
             android:ellipsize="end"
             android:maxLines="1" />
 
         <TextView
-            android:id="@+id/widget_txn2_amount"
+            android:id="@+id/widget_cat2_amount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#FFEF9A9A"
+            android:textColor="#FFFFFFFF"
             android:textSize="12sp"
             android:textStyle="bold" />
 
     </LinearLayout>
 
-    <!-- Transaction 3 -->
+    <!-- Category 3 -->
     <LinearLayout
-        android:id="@+id/widget_txn3_row"
+        android:id="@+id/widget_cat3_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingTop="2dp"
-        android:paddingBottom="2dp"
+        android:paddingTop="1dp"
+        android:paddingBottom="1dp"
         android:visibility="gone">
 
         <TextView
-            android:id="@+id/widget_txn3_desc"
+            android:id="@+id/widget_cat3_name"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textColor="#DDFFFFFF"
+            android:textColor="#EEFFFFFF"
             android:textSize="12sp"
             android:ellipsize="end"
             android:maxLines="1" />
 
         <TextView
-            android:id="@+id/widget_txn3_amount"
+            android:id="@+id/widget_cat3_amount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#FFEF9A9A"
+            android:textColor="#FFFFFFFF"
             android:textSize="12sp"
             android:textStyle="bold" />
 
     </LinearLayout>
 
-    <!-- No transactions message -->
+    <!-- Category 4 -->
+    <LinearLayout
+        android:id="@+id/widget_cat4_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="1dp"
+        android:paddingBottom="1dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/widget_cat4_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#EEFFFFFF"
+            android:textSize="12sp"
+            android:ellipsize="end"
+            android:maxLines="1" />
+
+        <TextView
+            android:id="@+id/widget_cat4_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <!-- Category 5 -->
+    <LinearLayout
+        android:id="@+id/widget_cat5_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="1dp"
+        android:paddingBottom="1dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/widget_cat5_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#EEFFFFFF"
+            android:textSize="12sp"
+            android:ellipsize="end"
+            android:maxLines="1" />
+
+        <TextView
+            android:id="@+id/widget_cat5_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <!-- No categories message -->
     <TextView
-        android:id="@+id/widget_no_txns"
+        android:id="@+id/widget_no_cats"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No transactions yet"
+        android:text="No categorized spend this month"
         android:textColor="#80FFFFFF"
         android:textSize="12sp"
         android:gravity="center"

@@ -12,7 +12,8 @@ import com.aryaman.spendtracker.data.model.TransactionStatus
     indices = [
         Index(value = ["referenceNumber"]),
         Index(value = ["timestampMillis"]),
-        Index(value = ["status"])
+        Index(value = ["status"]),
+        Index(value = ["isCreditCard"])
     ]
 )
 data class TransactionEntity(
@@ -31,5 +32,7 @@ data class TransactionEntity(
     val ruleIdApplied: Long? = null,
     val referenceNumber: String? = null,
     val accountInfo: String? = null,
-    val comment: String? = null
+    val comment: String? = null,
+    val isCreditCard: Boolean = false,
+    val isBudgetExempt: Boolean = false
 )

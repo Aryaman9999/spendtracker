@@ -240,6 +240,7 @@ class MainActivity : ComponentActivity() {
                                     transactions = periodTransactions,
                                     categorySpends = categorySpends,
                                     roommateBalances = roommateBalances,
+                                    categories = categories,
                                     pendingCount = pendingTransactions.size,
                                     periodType = selectedPeriodType,
                                     periodLabel = periodWindow.label,
@@ -257,7 +258,13 @@ class MainActivity : ComponentActivity() {
                                         selectedCategoryFilter = catFilter
                                         currentScreen = Screen.TRANSACTIONS
                                     },
-                                    onNavigateToSplits = { currentScreen = Screen.SPLITS }
+                                    onNavigateToSplits = { currentScreen = Screen.SPLITS },
+                                    onUpdateCategoryBudget = { cat, budget ->
+                                        scope.launch(Dispatchers.IO) {
+                                            repository.updateCategoryBudget(cat, budget)
+                                            SpendWidgetProvider.refreshAllWidgets(this@MainActivity)
+                                        }
+                                    }
                                 )
 
                                 Screen.TRANSACTIONS -> TransactionsScreen(
@@ -275,16 +282,30 @@ class MainActivity : ComponentActivity() {
                                                 category = cat,
                                                 createRuleKeyword = if (createRule) txn?.cleanMerchant else null
                                             )
+                                            SpendWidgetProvider.refreshAllWidgets(this@MainActivity)
                                         }
                                     },
                                     onSplit = { id, myActualShare, splitsList ->
                                         scope.launch(Dispatchers.IO) {
                                             repository.splitTransaction(id, myActualShare, splitsList)
+                                            SpendWidgetProvider.refreshAllWidgets(this@MainActivity)
                                         }
                                     },
                                     onToggleSplit = { id ->
                                         scope.launch(Dispatchers.IO) {
                                             repository.toggleQuickSplit(id)
+                                            SpendWidgetProvider.refreshAllWidgets(this@MainActivity)
+                                        }
+                                    },
+                                    onToggleCreditCard = { id ->
+                                        scope.launch(Dispatchers.IO) {
+                                            repository.toggleCreditCard(id)
+                                        }
+                                    },
+                                    onToggleBudgetExempt = { id ->
+                                        scope.launch(Dispatchers.IO) {
+                                            repository.toggleBudgetExempt(id)
+                                            SpendWidgetProvider.refreshAllWidgets(this@MainActivity)
                                         }
                                     },
                                     onUpdateComment = { id, comment ->
@@ -295,6 +316,7 @@ class MainActivity : ComponentActivity() {
                                     onDelete = { id ->
                                         scope.launch(Dispatchers.IO) {
                                             repository.deleteTransaction(id)
+                                            SpendWidgetProvider.refreshAllWidgets(this@MainActivity)
                                         }
                                     }
                                 )
@@ -333,6 +355,12 @@ class MainActivity : ComponentActivity() {
                                     onToggleTemplateActive = { id, isActive ->
                                         scope.launch(Dispatchers.IO) {
                                             repository.setTemplateActive(id, isActive)
+                                        }
+                                    },
+                                    onUpdateCategoryBudget = { cat, budget ->
+                                        scope.launch(Dispatchers.IO) {
+                                            repository.updateCategoryBudget(cat, budget)
+                                            SpendWidgetProvider.refreshAllWidgets(this@MainActivity)
                                         }
                                     },
                                     onNavigateToColorOsGuide = {
