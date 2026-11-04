@@ -5,25 +5,41 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="14dp"
+    android:padding="16dp"
     android:background="@drawable/widget_background">
 
-    <!-- Header Row -->
+    <!-- Header Row: Title & Refresh Button -->
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="6dp">
+        android:layout_marginBottom="8dp">
 
-        <TextView
-            android:id="@+id/widget_title"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentStart="true"
             android:layout_centerVertical="true"
-            android:text="SpendTracker"
-            android:textColor="#FFFFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✦ "
+                android:textColor="#818CF8"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SpendTracker"
+                android:textColor="#F3F4F6"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
 
         <ImageButton
             android:id="@+id/widget_refresh_button"
@@ -34,230 +50,381 @@
             android:background="@android:color/transparent"
             android:contentDescription="Refresh"
             android:src="@drawable/ic_refresh"
-            android:scaleType="centerInside" />
+            android:scaleType="centerInside"
+            android:padding="4dp" />
 
     </RelativeLayout>
 
-    <!-- Today's Spend -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Today"
-        android:textColor="#B3FFFFFF"
-        android:textSize="11sp" />
-
-    <TextView
-        android:id="@+id/widget_today_amount"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="₹0"
-        android:textColor="#FFFFFFFF"
-        android:textSize="26sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="2dp" />
-
-    <!-- Month's Spend -->
+    <!-- Spending Overview: Today & This Month side by side -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginBottom="8dp">
+        android:gravity="center_vertical"
+        android:layout_marginBottom="10dp">
 
-        <TextView
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TODAY"
+                android:textColor="#94A3B8"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_today_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="₹0"
+                android:textColor="#FFFFFF"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="This month: "
-            android:textColor="#B3FFFFFF"
-            android:textSize="12sp" />
+            android:orientation="vertical"
+            android:gravity="end">
 
-        <TextView
-            android:id="@+id/widget_month_amount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="₹0"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="THIS MONTH"
+                android:textColor="#94A3B8"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_month_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="₹0"
+                android:textColor="#F1F5F9"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
 
     </LinearLayout>
 
-    <!-- Divider (FrameLayout is guaranteed safe in RemoteViews) -->
+    <!-- Divider -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#33FFFFFF"
-        android:layout_marginBottom="6dp" />
+        android:background="#22FFFFFF"
+        android:layout_marginBottom="8dp" />
 
-    <!-- Top Categories Label -->
-    <TextView
-        android:layout_width="wrap_content"
+    <!-- Section Header -->
+    <RelativeLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="TOP CATEGORIES THIS MONTH"
-        android:textColor="#80FFFFFF"
-        android:textSize="10sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="3dp" />
+        android:layout_marginBottom="8dp">
 
-    <!-- Category 1 -->
+        <TextView
+            android:id="@+id/widget_section_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:text="TOP CATEGORIES &amp; BUDGETS"
+            android:textColor="#94A3B8"
+            android:textSize="10.5sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_status_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:text="MONTHLY"
+            android:textColor="#64748B"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+    </RelativeLayout>
+
+    <!-- Category 1 Row -->
     <LinearLayout
         android:id="@+id/widget_cat1_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="1dp"
-        android:paddingBottom="1dp"
+        android:orientation="vertical"
+        android:layout_marginBottom="9dp"
         android:visibility="gone">
 
-        <TextView
-            android:id="@+id/widget_cat1_name"
-            android:layout_width="0dp"
+        <RelativeLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="#EEFFFFFF"
-            android:textSize="12sp"
-            android:ellipsize="end"
-            android:maxLines="1" />
+            android:layout_marginBottom="4dp">
 
-        <TextView
-            android:id="@+id/widget_cat1_amount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            <TextView
+                android:id="@+id/widget_cat1_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:textColor="#FFFFFF"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                android:singleLine="true" />
+
+            <TextView
+                android:id="@+id/widget_cat1_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_toStartOf="@+id/widget_cat1_amount"
+                android:layout_marginEnd="6dp"
+                android:textColor="#F3F4F6"
+                android:textSize="13.5sp"
+                android:textStyle="bold"
+                android:ellipsize="end"
+                android:singleLine="true" />
+
+        </RelativeLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="7dp">
+
+            <ProgressBar
+                android:id="@+id/widget_cat1_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="7dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_progress_bar_1" />
+
+            <ProgressBar
+                android:id="@+id/widget_cat1_progress_alert"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="7dp"
+                android:max="100"
+                android:progress="100"
+                android:progressDrawable="@drawable/widget_progress_bar_alert"
+                android:visibility="gone" />
+
+        </FrameLayout>
 
     </LinearLayout>
 
-    <!-- Category 2 -->
+    <!-- Category 2 Row -->
     <LinearLayout
         android:id="@+id/widget_cat2_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="1dp"
-        android:paddingBottom="1dp"
+        android:orientation="vertical"
+        android:layout_marginBottom="9dp"
         android:visibility="gone">
 
-        <TextView
-            android:id="@+id/widget_cat2_name"
-            android:layout_width="0dp"
+        <RelativeLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="#EEFFFFFF"
-            android:textSize="12sp"
-            android:ellipsize="end"
-            android:maxLines="1" />
+            android:layout_marginBottom="4dp">
 
-        <TextView
-            android:id="@+id/widget_cat2_amount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            <TextView
+                android:id="@+id/widget_cat2_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:textColor="#FFFFFF"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                android:singleLine="true" />
+
+            <TextView
+                android:id="@+id/widget_cat2_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_toStartOf="@+id/widget_cat2_amount"
+                android:layout_marginEnd="6dp"
+                android:textColor="#F3F4F6"
+                android:textSize="13.5sp"
+                android:textStyle="bold"
+                android:ellipsize="end"
+                android:singleLine="true" />
+
+        </RelativeLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="7dp">
+
+            <ProgressBar
+                android:id="@+id/widget_cat2_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="7dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_progress_bar_2" />
+
+            <ProgressBar
+                android:id="@+id/widget_cat2_progress_alert"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="7dp"
+                android:max="100"
+                android:progress="100"
+                android:progressDrawable="@drawable/widget_progress_bar_alert"
+                android:visibility="gone" />
+
+        </FrameLayout>
 
     </LinearLayout>
 
-    <!-- Category 3 -->
+    <!-- Category 3 Row -->
     <LinearLayout
         android:id="@+id/widget_cat3_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="1dp"
-        android:paddingBottom="1dp"
+        android:orientation="vertical"
+        android:layout_marginBottom="9dp"
         android:visibility="gone">
 
-        <TextView
-            android:id="@+id/widget_cat3_name"
-            android:layout_width="0dp"
+        <RelativeLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="#EEFFFFFF"
-            android:textSize="12sp"
-            android:ellipsize="end"
-            android:maxLines="1" />
+            android:layout_marginBottom="4dp">
 
-        <TextView
-            android:id="@+id/widget_cat3_amount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            <TextView
+                android:id="@+id/widget_cat3_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:textColor="#FFFFFF"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                android:singleLine="true" />
+
+            <TextView
+                android:id="@+id/widget_cat3_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_toStartOf="@+id/widget_cat3_amount"
+                android:layout_marginEnd="6dp"
+                android:textColor="#F3F4F6"
+                android:textSize="13.5sp"
+                android:textStyle="bold"
+                android:ellipsize="end"
+                android:singleLine="true" />
+
+        </RelativeLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="7dp">
+
+            <ProgressBar
+                android:id="@+id/widget_cat3_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="7dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_progress_bar_3" />
+
+            <ProgressBar
+                android:id="@+id/widget_cat3_progress_alert"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="7dp"
+                android:max="100"
+                android:progress="100"
+                android:progressDrawable="@drawable/widget_progress_bar_alert"
+                android:visibility="gone" />
+
+        </FrameLayout>
 
     </LinearLayout>
 
-    <!-- Category 4 -->
+    <!-- Category 4 Row -->
     <LinearLayout
         android:id="@+id/widget_cat4_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="1dp"
-        android:paddingBottom="1dp"
+        android:orientation="vertical"
+        android:layout_marginBottom="4dp"
         android:visibility="gone">
 
-        <TextView
-            android:id="@+id/widget_cat4_name"
-            android:layout_width="0dp"
+        <RelativeLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="#EEFFFFFF"
-            android:textSize="12sp"
-            android:ellipsize="end"
-            android:maxLines="1" />
+            android:layout_marginBottom="4dp">
 
-        <TextView
-            android:id="@+id/widget_cat4_amount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            <TextView
+                android:id="@+id/widget_cat4_amount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:textColor="#FFFFFF"
+                android:textSize="12.5sp"
+                android:textStyle="bold"
+                android:singleLine="true" />
+
+            <TextView
+                android:id="@+id/widget_cat4_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_toStartOf="@+id/widget_cat4_amount"
+                android:layout_marginEnd="6dp"
+                android:textColor="#F3F4F6"
+                android:textSize="13.5sp"
+                android:textStyle="bold"
+                android:ellipsize="end"
+                android:singleLine="true" />
+
+        </RelativeLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="7dp">
+
+            <ProgressBar
+                android:id="@+id/widget_cat4_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="7dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_progress_bar_4" />
+
+            <ProgressBar
+                android:id="@+id/widget_cat4_progress_alert"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="7dp"
+                android:max="100"
+                android:progress="100"
+                android:progressDrawable="@drawable/widget_progress_bar_alert"
+                android:visibility="gone" />
+
+        </FrameLayout>
 
     </LinearLayout>
 
-    <!-- Category 5 -->
-    <LinearLayout
-        android:id="@+id/widget_cat5_row"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="1dp"
-        android:paddingBottom="1dp"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/widget_cat5_name"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="#EEFFFFFF"
-            android:textSize="12sp"
-            android:ellipsize="end"
-            android:maxLines="1" />
-
-        <TextView
-            android:id="@+id/widget_cat5_amount"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-    </LinearLayout>
-
-    <!-- No categories message -->
+    <!-- Empty State -->
     <TextView
         android:id="@+id/widget_no_cats"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No categorized spend this month"
-        android:textColor="#80FFFFFF"
-        android:textSize="12sp"
+        android:text="No categorized spend or budgets yet"
+        android:textColor="#64748B"
+        android:textSize="13sp"
         android:gravity="center"
-        android:paddingTop="4dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="6dp"
         android:visibility="gone" />
 
 </LinearLayout>

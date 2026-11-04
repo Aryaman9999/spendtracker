@@ -81,6 +81,21 @@ interface TransactionDao {
     fun getBudgetSpendByCategory(startTimestamp: Long, endTimestamp: Long): Flow<List<CategorySpendSummary>>
 
     /**
+     * Synchronous budget spend by category (excluding exempt txns) for homescreen widget.
+     */
+    @Query("""
+        SELECT category, SUM(myActualShare) as totalAmount 
+        FROM transactions 
+        WHERE direction = 'DEBIT' 
+          AND timestampMillis BETWEEN :startTimestamp AND :endTimestamp 
+          AND category IS NOT NULL
+          AND isBudgetExempt = 0
+        GROUP BY category 
+        ORDER BY totalAmount DESC
+    """)
+    suspend fun getBudgetSpendByCategorySync(startTimestamp: Long, endTimestamp: Long): List<CategorySpendSummary>
+
+    /**
      * Top categories in time window synchronously, for the homescreen widget.
      */
     @Query("""
