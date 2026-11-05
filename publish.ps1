@@ -140,7 +140,7 @@ if ($ghCmd) {
         git push origin master --quiet
 
         $releaseNotes = if ($Notes -ne "") { $Notes } else { "Release v${vName}: In-app OTA update and enhancements." }
-        & gh release create "v$vName" $rootApk --title "SpendTracker v$vName" --notes "$releaseNotes" --clobber
+        & gh release create "v$vName" $rootApk --title "SpendTracker v$vName" --notes "$releaseNotes"
         Write-Host "[+] Published to GitHub Releases: https://github.com/Aryaman9999/spendtracker/releases/tag/v$vName" -ForegroundColor Green
     } catch {
         Write-Host "[-] GitHub release creation skipped or failed: $_" -ForegroundColor Yellow
