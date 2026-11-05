@@ -16,6 +16,7 @@ import com.aryaman.spendtracker.data.local.entity.CategoryRuleEntity
 import com.aryaman.spendtracker.data.local.entity.SmsTemplateEntity
 import com.aryaman.spendtracker.data.local.entity.SplitEntryEntity
 import com.aryaman.spendtracker.data.local.entity.TransactionEntity
+import com.aryaman.spendtracker.data.parser.DefaultTemplates
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -28,7 +29,7 @@ import kotlinx.coroutines.launch
         CategoryEntity::class,
         SmsTemplateEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -132,6 +133,29 @@ abstract class SpendDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Add isCreditCard column to sms_templates
+                db.execSQL("ALTER TABLE sms_templates ADD COLUMN isCreditCard INTEGER NOT NULL DEFAULT 0")
+
+                // 2. Insert default universal bank format templates if not present
+                for (template in DefaultTemplates.getList()) {
+                    val senderFilterVal = template.senderFilter?.let { "'$it'" } ?: "NULL"
+                    val isCcVal = if (template.isCreditCard) 1 else 0
+                    val escapedRegex = template.regexPattern.replace("'", "''")
+                    val escapedSample = template.sampleText.replace("'", "''")
+                    val escapedBank = template.bankName.replace("'", "''")
+                    val dirVal = template.direction.name
+
+                    db.execSQL("""
+                        INSERT INTO sms_templates (bankName, senderFilter, regexPattern, direction, sampleText, categoryHint, isActive, isCreditCard, createdAt)
+                        SELECT '$escapedBank', $senderFilterVal, '$escapedRegex', '$dirVal', '$escapedSample', NULL, 1, $isCcVal, ${template.createdAt}
+                        WHERE NOT EXISTS (SELECT 1 FROM sms_templates WHERE bankName = '$escapedBank')
+                    """.trimIndent())
+                }
+            }
+        }
+
         fun getInstance(context: Context): SpendDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -149,7 +173,7 @@ abstract class SpendDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
@@ -204,6 +228,8 @@ abstract class SpendDatabase : RoomDatabase() {
                 CategoryRuleEntity(keyword = "iocl", category = "Fuel", priority = 22)
             )
             db.categoryRuleDao().insertAll(initialRules)
+
+            db.smsTemplateDao().insertAll(DefaultTemplates.getList())
         }
     }
 }

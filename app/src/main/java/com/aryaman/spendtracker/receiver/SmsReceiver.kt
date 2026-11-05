@@ -6,8 +6,6 @@ import android.content.Intent
 import android.provider.Telephony
 import com.aryaman.spendtracker.SpendTrackerApp
 import com.aryaman.spendtracker.data.parser.DynamicTemplateParser
-import com.aryaman.spendtracker.data.parser.HdfcSmsParser
-import com.aryaman.spendtracker.data.parser.SbiSmsParser
 import com.aryaman.spendtracker.data.repository.TransactionProcessResult
 import com.aryaman.spendtracker.widget.SpendWidgetProvider
 import kotlinx.coroutines.CoroutineScope
@@ -34,21 +32,9 @@ class SmsReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 1. Check user custom dynamic templates FIRST!
+                // 1. Dynamic bank format templates (both preloaded and user-configured)
                 val activeTemplates = repository.getActiveTemplatesList()
-                var parsed = DynamicTemplateParser.parse(fullBody, sender, timestamp, activeTemplates)
-
-                // 2. Fall back to built-in parsers (HDFC & SBI)
-                if (parsed == null) {
-                    val isHdfc = HdfcSmsParser.isHdfcSender(sender)
-                    val isSbi = SbiSmsParser.isSbiSender(sender)
-
-                    parsed = when {
-                        isHdfc -> HdfcSmsParser.parse(fullBody, timestamp)
-                        isSbi -> SbiSmsParser.parse(fullBody, timestamp)
-                        else -> null
-                    }
-                }
+                val parsed = DynamicTemplateParser.parse(fullBody, sender, timestamp, activeTemplates)
 
                 if (parsed == null) return@launch
 

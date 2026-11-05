@@ -143,4 +143,18 @@ class DynamicTemplateParserTest {
         assertEquals(TransactionDirection.CREDIT, success.preview.direction)
         assertEquals("Ramesh", success.preview.cleanMerchant)
     }
+
+    @Test
+    fun testDefaultTemplatesMatchSampleTexts() {
+        val templates = DefaultTemplates.getList()
+        assertTrue(templates.isNotEmpty())
+
+        for (template in templates) {
+            val parsed = DynamicTemplateParser.parseSingle(template.sampleText, System.currentTimeMillis(), template)
+            assertNotNull("Template '${template.bankName}' failed to parse its sampleText", parsed)
+            assertTrue("Template '${template.bankName}' parsed amount should be > 0", parsed!!.amount > 0)
+            assertEquals("Template '${template.bankName}' direction mismatch", template.direction, parsed.direction)
+            assertEquals("Template '${template.bankName}' isCreditCard mismatch", template.isCreditCard, parsed.isCreditCard)
+        }
+    }
 }

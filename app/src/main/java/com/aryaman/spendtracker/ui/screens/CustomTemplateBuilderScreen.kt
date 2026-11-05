@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,12 +36,14 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomTemplateBuilderScreen(
+    templateToEdit: SmsTemplateEntity? = null,
     onBack: () -> Unit,
     onSaveTemplate: (SmsTemplateEntity) -> Unit
 ) {
-    var bankName by remember { mutableStateOf("") }
-    var senderFilter by remember { mutableStateOf("") }
-    var sampleText by remember { mutableStateOf("") }
+    var bankName by remember { mutableStateOf(templateToEdit?.bankName ?: "") }
+    var senderFilter by remember { mutableStateOf(templateToEdit?.senderFilter ?: "") }
+    var sampleText by remember { mutableStateOf(templateToEdit?.sampleText ?: "") }
+    var isCreditCard by remember { mutableStateOf(templateToEdit?.isCreditCard ?: false) }
 
     var amountSnippet by remember { mutableStateOf("") }
     var merchantSnippet by remember { mutableStateOf("") }
@@ -48,7 +51,27 @@ fun CustomTemplateBuilderScreen(
     var timeSnippet by remember { mutableStateOf("") }
     var accountSnippet by remember { mutableStateOf("") }
     var refSnippet by remember { mutableStateOf("") }
-    var direction by remember { mutableStateOf(TransactionDirection.DEBIT) }
+    var direction by remember { mutableStateOf(templateToEdit?.direction ?: TransactionDirection.DEBIT) }
+
+    fun applyAutoDetect(text: String) {
+        val detected = TemplateSynthesizer.autoDetectSlots(text)
+        detected.amount?.let { amountSnippet = it }
+        detected.merchant?.let { merchantSnippet = it }
+        detected.date?.let { dateSnippet = it }
+        detected.time?.let { timeSnippet = it }
+        detected.account?.let { accountSnippet = it }
+        detected.ref?.let { refSnippet = it }
+        direction = detected.direction
+        if (templateToEdit == null && detected.isCreditCard) {
+            isCreditCard = true
+        }
+    }
+
+    LaunchedEffect(templateToEdit) {
+        if (templateToEdit != null && sampleText.isNotBlank()) {
+            applyAutoDetect(sampleText)
+        }
+    }
 
     // Test second SMS state
     var testSmsText by remember { mutableStateOf("") }
@@ -66,7 +89,8 @@ fun CustomTemplateBuilderScreen(
         refSnippet,
         direction,
         bankName,
-        senderFilter
+        senderFilter,
+        isCreditCard
     ) {
         derivedStateOf {
             if (sampleText.isBlank() || amountSnippet.isBlank() || merchantSnippet.isBlank()) {
@@ -82,27 +106,17 @@ fun CustomTemplateBuilderScreen(
                     refSnippet = refSnippet.takeIf { it.isNotBlank() },
                     direction = direction,
                     bankName = bankName.ifBlank { "Custom Bank" },
-                    senderFilter = senderFilter.takeIf { it.isNotBlank() }
+                    senderFilter = senderFilter.takeIf { it.isNotBlank() },
+                    isCreditCard = isCreditCard
                 )
             }
         }
     }
 
-    fun applyAutoDetect(text: String) {
-        val detected = TemplateSynthesizer.autoDetectSlots(text)
-        detected.amount?.let { amountSnippet = it }
-        detected.merchant?.let { merchantSnippet = it }
-        detected.date?.let { dateSnippet = it }
-        detected.time?.let { timeSnippet = it }
-        detected.account?.let { accountSnippet = it }
-        detected.ref?.let { refSnippet = it }
-        direction = detected.direction
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add Bank SMS Format", fontWeight = FontWeight.Bold) },
+                title = { Text(if (templateToEdit != null) "Edit Bank SMS Format" else "Add Bank SMS Format", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -163,6 +177,37 @@ fun CustomTemplateBuilderScreen(
                     Text("Leave blank to match messages from any sender with this format.")
                 }
             )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.CreditCard, contentDescription = null, tint = PrimaryIndigo, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Credit Card Format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(
+                                "Tag transactions matching this format as Credit Card",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = isCreditCard,
+                        onCheckedChange = { isCreditCard = it }
+                    )
+                }
+            }
 
             HorizontalDivider()
 
@@ -419,11 +464,15 @@ fun CustomTemplateBuilderScreen(
                 onClick = {
                     val pattern = (synthesisResult as? SynthesisResult.Success)?.regexPattern ?: return@Button
                     val template = SmsTemplateEntity(
+                        id = templateToEdit?.id ?: 0,
                         bankName = bankName.ifBlank { "Custom Bank" },
                         senderFilter = senderFilter.trim().takeIf { it.isNotBlank() },
                         regexPattern = pattern,
                         direction = direction,
-                        sampleText = sampleText.trim()
+                        sampleText = sampleText.trim(),
+                        isCreditCard = isCreditCard,
+                        isActive = templateToEdit?.isActive ?: true,
+                        createdAt = templateToEdit?.createdAt ?: System.currentTimeMillis()
                     )
                     onSaveTemplate(template)
                 },
@@ -433,7 +482,7 @@ fun CustomTemplateBuilderScreen(
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Text("Save Bank Format", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(if (templateToEdit != null) "Update Bank Format" else "Save Bank Format", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
 
             Spacer(Modifier.height(32.dp))

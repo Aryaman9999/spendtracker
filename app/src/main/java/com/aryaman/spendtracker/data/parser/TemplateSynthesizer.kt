@@ -11,7 +11,8 @@ data class DetectedSlots(
     val time: String? = null,
     val account: String? = null,
     val ref: String? = null,
-    val direction: TransactionDirection = TransactionDirection.DEBIT
+    val direction: TransactionDirection = TransactionDirection.DEBIT,
+    val isCreditCard: Boolean = false
 )
 
 sealed class SynthesisResult {
@@ -56,6 +57,9 @@ object TemplateSynthesizer {
         val merchantRegex = Regex("""(?:at|to|from|by)\s+([A-Za-z0-9\s.@_-]+?)(?=\s+(?:via|on|ref|using|avail|bal|avl)|$)""", RegexOption.IGNORE_CASE)
         val merchant = merchantRegex.find(trimmed)?.groupValues?.get(1)?.trim()
 
+        // 8. Detect Credit Card
+        val isCreditCard = Regex("""\b(credit card|creditcard|pixel play|card ending)\b""", RegexOption.IGNORE_CASE).containsMatchIn(trimmed)
+
         return DetectedSlots(
             amount = amount,
             merchant = merchant,
@@ -63,7 +67,8 @@ object TemplateSynthesizer {
             time = time,
             account = account,
             ref = ref,
-            direction = direction
+            direction = direction,
+            isCreditCard = isCreditCard
         )
     }
 
@@ -87,7 +92,8 @@ object TemplateSynthesizer {
         refSnippet: String?,
         direction: TransactionDirection,
         bankName: String,
-        senderFilter: String?
+        senderFilter: String?,
+        isCreditCard: Boolean = false
     ): SynthesisResult {
         val trimmed = sampleText.trim()
         if (trimmed.isBlank()) {
@@ -189,7 +195,8 @@ object TemplateSynthesizer {
             senderFilter = senderFilter,
             regexPattern = pattern,
             direction = direction,
-            sampleText = sampleText
+            sampleText = sampleText,
+            isCreditCard = isCreditCard
         )
 
         val preview = DynamicTemplateParser.parseSingle(trimmed, System.currentTimeMillis(), testTemplate)

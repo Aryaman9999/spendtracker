@@ -13,12 +13,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +44,7 @@ fun RuleManagerScreen(
     onAddRule: (rule: CategoryRuleEntity) -> Unit,
     onDeleteRule: (rule: CategoryRuleEntity) -> Unit,
     onNavigateToAddTemplate: () -> Unit = {},
+    onEditTemplate: (SmsTemplateEntity) -> Unit = {},
     onDeleteTemplate: (SmsTemplateEntity) -> Unit = {},
     onToggleTemplateActive: (Long, Boolean) -> Unit = { _, _ -> },
     onUpdateCategoryBudget: (categoryName: String, budget: Double?) -> Unit = { _, _ -> },
@@ -385,7 +389,7 @@ fun RuleManagerScreen(
 
                                     Spacer(Modifier.height(8.dp))
 
-                                    // Direction and Details badge
+                                    // Direction, Credit Card, and Active badges
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Surface(
                                             shape = MaterialTheme.shapes.extraSmall,
@@ -398,6 +402,32 @@ fun RuleManagerScreen(
                                                 color = if (isDebit) RoseDebit else EmeraldSuccess,
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
+                                        }
+                                        if (template.isCreditCard) {
+                                            Spacer(Modifier.width(8.dp))
+                                            Surface(
+                                                shape = MaterialTheme.shapes.extraSmall,
+                                                color = Color(0xFF673AB7).copy(alpha = 0.12f)
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.CreditCard,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF9575CD),
+                                                        modifier = Modifier.size(11.dp)
+                                                    )
+                                                    Spacer(Modifier.width(3.dp))
+                                                    Text(
+                                                        text = "Credit Card",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF9575CD)
+                                                    )
+                                                }
+                                            }
                                         }
                                         Spacer(Modifier.width(8.dp))
                                         Text(
@@ -422,8 +452,15 @@ fun RuleManagerScreen(
 
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End
+                                        horizontalArrangement = Arrangement.End,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        TextButton(onClick = { onEditTemplate(template) }) {
+                                            Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(15.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("Edit")
+                                        }
+                                        Spacer(Modifier.width(4.dp))
                                         IconButton(onClick = { onDeleteTemplate(template) }) {
                                             Icon(
                                                 Icons.Default.Delete,

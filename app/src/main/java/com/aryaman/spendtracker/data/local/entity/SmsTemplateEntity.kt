@@ -15,5 +15,6 @@ data class SmsTemplateEntity(
     val sampleText: String,
     val categoryHint: String? = null,
     val isActive: Boolean = true,
+    val isCreditCard: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 )

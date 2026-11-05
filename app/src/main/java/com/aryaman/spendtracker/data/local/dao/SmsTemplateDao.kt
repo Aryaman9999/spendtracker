@@ -22,6 +22,9 @@ interface SmsTemplateDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(template: SmsTemplateEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(templates: List<SmsTemplateEntity>)
+
     @Update
     suspend fun update(template: SmsTemplateEntity)
 

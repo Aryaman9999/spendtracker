@@ -439,7 +439,7 @@ fun TransactionDetailCard(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.CreditCard,
-                                        contentDescription = "HDFC CC",
+                                        contentDescription = "Credit Card",
                                         tint = Color(0xFFB39DDB),
                                         modifier = Modifier.size(10.dp)
                                     )
@@ -625,7 +625,7 @@ fun TransactionDetailCard(
                             FilterChip(
                                 selected = transaction.isCreditCard,
                                 onClick = { if (!transaction.isCreditCard) onToggleCreditCard() },
-                                label = { Text("HDFC CC", fontSize = 11.sp, fontWeight = if (transaction.isCreditCard) FontWeight.Bold else FontWeight.Normal) },
+                                label = { Text("Credit Card", fontSize = 11.sp, fontWeight = if (transaction.isCreditCard) FontWeight.Bold else FontWeight.Normal) },
                                 leadingIcon = { Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(12.dp)) },
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.height(28.dp)

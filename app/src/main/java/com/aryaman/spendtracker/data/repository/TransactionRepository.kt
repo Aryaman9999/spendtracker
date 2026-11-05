@@ -93,11 +93,7 @@ class TransactionRepository(
 
         val isCc = parsed.isCreditCard ||
             parsed.rawText.contains("credit card", ignoreCase = true) ||
-            parsed.rawText.contains("pixel play", ignoreCase = true) ||
-            parsed.rawText.contains("hdfc card", ignoreCase = true) ||
-            parsed.rawText.contains("card ending", ignoreCase = true) ||
             parsed.accountInfo?.contains("Credit Card", ignoreCase = true) == true ||
-            parsed.accountInfo?.contains("Pixel", ignoreCase = true) == true ||
             parsed.accountInfo?.contains("CC", ignoreCase = true) == true
 
         val newEntity = TransactionEntity(

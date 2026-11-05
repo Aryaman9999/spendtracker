@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.aryaman.spendtracker.SpendTrackerApp
+import com.aryaman.spendtracker.data.local.entity.SmsTemplateEntity
 import com.aryaman.spendtracker.widget.SpendWidgetProvider
 import com.aryaman.spendtracker.ui.screens.*
 import com.aryaman.spendtracker.ui.theme.SpendTrackerTheme
@@ -82,6 +83,7 @@ class MainActivity : ComponentActivity() {
                     var currentScreen by remember { mutableStateOf(if (hasReviewIntent) Screen.TRANSACTIONS else Screen.DASHBOARD) }
                     var filterPendingInTransactions by remember { mutableStateOf(hasReviewIntent) }
                     var selectedCategoryFilter by remember { mutableStateOf<String?>(null) }
+                    var templateToEdit by remember { mutableStateOf<SmsTemplateEntity?>(null) }
 
                     // Reactive Flows from Room DB
                     val transactions by repository.allTransactions.collectAsState(initial = emptyList())
@@ -345,6 +347,11 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     onNavigateToAddTemplate = {
+                                        templateToEdit = null
+                                        currentScreen = Screen.ADD_TEMPLATE
+                                    },
+                                    onEditTemplate = { template ->
+                                        templateToEdit = template
                                         currentScreen = Screen.ADD_TEMPLATE
                                     },
                                     onDeleteTemplate = { template ->
@@ -376,12 +383,24 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 Screen.ADD_TEMPLATE -> {
-                                    BackHandler { currentScreen = Screen.RULES }
+                                    BackHandler {
+                                        templateToEdit = null
+                                        currentScreen = Screen.RULES
+                                    }
                                     CustomTemplateBuilderScreen(
-                                        onBack = { currentScreen = Screen.RULES },
+                                        templateToEdit = templateToEdit,
+                                        onBack = {
+                                            templateToEdit = null
+                                            currentScreen = Screen.RULES
+                                        },
                                         onSaveTemplate = { template ->
                                             scope.launch(Dispatchers.IO) {
-                                                repository.addTemplate(template)
+                                                if (template.id > 0) {
+                                                    repository.updateTemplate(template)
+                                                } else {
+                                                    repository.addTemplate(template)
+                                                }
+                                                templateToEdit = null
                                                 currentScreen = Screen.RULES
                                             }
                                         }

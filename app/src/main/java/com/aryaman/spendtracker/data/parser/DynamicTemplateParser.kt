@@ -64,7 +64,7 @@ object DynamicTemplateParser {
 
             // 2. Merchant / Payee (Required)
             val rawMerchant = safeGroup(match, "merchant")?.trim()?.ifBlank { "Unknown Payee" } ?: "Unknown Payee"
-            val cleanMerchant = HdfcSmsParser.cleanMerchantName(rawMerchant)
+            val cleanMerchant = MerchantCleaner.clean(rawMerchant)
 
             // 3. Direction (Debit or Credit)
             val capturedDir = safeGroup(match, "direction")?.lowercase(Locale.ROOT)
@@ -94,7 +94,8 @@ object DynamicTemplateParser {
                 referenceNumber = referenceNumber,
                 timestampMillis = timestamp,
                 source = TransactionSource.SMS,
-                rawText = smsBody.trim()
+                rawText = smsBody.trim(),
+                isCreditCard = template.isCreditCard
             )
         } catch (_: Exception) {
             null
