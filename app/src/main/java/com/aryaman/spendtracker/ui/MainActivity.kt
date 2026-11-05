@@ -9,7 +9,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CreditCard
@@ -23,17 +26,22 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.aryaman.spendtracker.BuildConfig
 import com.aryaman.spendtracker.SpendTrackerApp
 import com.aryaman.spendtracker.data.local.entity.SmsTemplateEntity
 import com.aryaman.spendtracker.receiver.NotificationHelper
+import com.aryaman.spendtracker.util.AppUpdateInfo
+import com.aryaman.spendtracker.util.UpdateChecker
 import com.aryaman.spendtracker.widget.SpendWidgetProvider
 import com.aryaman.spendtracker.ui.screens.*
 import com.aryaman.spendtracker.ui.theme.SpendTrackerTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 enum class Screen {
@@ -90,6 +98,17 @@ class MainActivity : ComponentActivity() {
                     var filterPendingInTransactions by remember { mutableStateOf(hasReviewIntent) }
                     var selectedCategoryFilter by remember { mutableStateOf<String?>(null) }
                     var templateToEdit by remember { mutableStateOf<SmsTemplateEntity?>(null) }
+                    var availableUpdate by remember { mutableStateOf<AppUpdateInfo?>(null) }
+
+                    // Automatic Background Check for OTA Updates via GitHub Releases
+                    LaunchedEffect(Unit) {
+                        try {
+                            val update = UpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
+                            if (update != null && update.isUpdateAvailable) {
+                                availableUpdate = update
+                            }
+                        } catch (_: Exception) {}
+                    }
 
                     // Reactive Flows from Room DB
                     val transactions by repository.allTransactions.collectAsState(initial = emptyList())
@@ -382,6 +401,22 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onNavigateToColorOsGuide = {
                                         currentScreen = Screen.COLOROS_GUIDE
+                                    },
+                                    onCheckUpdate = {
+                                        scope.launch(Dispatchers.IO) {
+                                            val update = UpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
+                                            withContext(Dispatchers.Main) {
+                                                if (update != null && update.isUpdateAvailable) {
+                                                    availableUpdate = update
+                                                } else {
+                                                    android.widget.Toast.makeText(
+                                                        this@MainActivity,
+                                                        "SpendTracker is up to date (v${BuildConfig.VERSION_NAME})",
+                                                        android.widget.Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            }
+                                        }
                                     }
                                 )
 
@@ -417,6 +452,61 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             }
+                        }
+
+                        // In-App OTA Update Dialog (1-Tap Experience)
+                        availableUpdate?.let { update ->
+                            AlertDialog(
+                                onDismissRequest = { availableUpdate = null },
+                                title = {
+                                    Text(
+                                        text = "Update Available: v${update.latestVersion}",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleLarge
+                                    )
+                                },
+                                text = {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(
+                                            text = "A new version of SpendTracker is available.",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        if (update.releaseNotes.isNotBlank()) {
+                                            Surface(
+                                                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(
+                                                    text = update.releaseNotes,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.padding(10.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    Button(
+                                        onClick = {
+                                            UpdateChecker.startDownloadAndInstall(
+                                                context = this@MainActivity,
+                                                apkUrl = update.downloadUrl,
+                                                version = update.latestVersion
+                                            )
+                                            availableUpdate = null
+                                        }
+                                    ) {
+                                        Text("Download & Install", fontWeight = FontWeight.Bold)
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { availableUpdate = null }) {
+                                        Text("Later")
+                                    }
+                                }
+                            )
                         }
                     }
                 }

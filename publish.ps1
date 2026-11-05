@@ -2,7 +2,8 @@ param(
     [switch]$BumpPatch,
     [switch]$BumpMinor,
     [switch]$Serve,
-    [string]$Version = ""
+    [string]$Version = "",
+    [string]$Notes = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -126,9 +127,29 @@ foreach ($gPath in $gDrivePaths) {
     }
 }
 
+# 7. Publish to GitHub Releases (Powers In-App OTA Updates)
+$ghCmd = Get-Command gh -ErrorAction SilentlyContinue
+if ($ghCmd) {
+    try {
+        Write-Host "`n[+] Publishing release v$vName to GitHub for OTA updates..." -ForegroundColor Cyan
+        git add -A
+        $gitStatus = git status --porcelain
+        if ($gitStatus) {
+            git commit -m "chore: release v$vName (Build $vCode)"
+        }
+        git push origin master --quiet
+
+        $releaseNotes = if ($Notes -ne "") { $Notes } else { "Release v${vName}: In-app OTA update and enhancements." }
+        & gh release create "v$vName" $rootApk --title "SpendTracker v$vName" --notes "$releaseNotes" --clobber
+        Write-Host "[+] Published to GitHub Releases: https://github.com/Aryaman9999/spendtracker/releases/tag/v$vName" -ForegroundColor Green
+    } catch {
+        Write-Host "[-] GitHub release creation skipped or failed: $_" -ForegroundColor Yellow
+    }
+}
+
 Write-Host "`n🎉 Build complete: v$vName (Build $vCode)" -ForegroundColor Cyan
 
-# 7. Optional Local Wi-Fi Direct Server
+# 8. Optional Local Wi-Fi Direct Server
 if ($Serve) {
     Write-Host "[+] Launching Wi-Fi direct download server..." -ForegroundColor Green
     python serve_apk.py

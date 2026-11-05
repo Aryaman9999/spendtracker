@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -48,7 +49,8 @@ fun RuleManagerScreen(
     onDeleteTemplate: (SmsTemplateEntity) -> Unit = {},
     onToggleTemplateActive: (Long, Boolean) -> Unit = { _, _ -> },
     onUpdateCategoryBudget: (categoryName: String, budget: Double?) -> Unit = { _, _ -> },
-    onNavigateToColorOsGuide: () -> Unit
+    onNavigateToColorOsGuide: () -> Unit,
+    onCheckUpdate: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAddRuleDialog by remember { mutableStateOf(false) }
@@ -93,16 +95,30 @@ fun RuleManagerScreen(
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
-                IconButton(
-                    onClick = onNavigateToColorOsGuide,
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Build,
-                        contentDescription = "ColorOS Setup",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onCheckUpdate,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.CloudDownload,
+                            contentDescription = "Check for Updates",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(
+                        onClick = onNavigateToColorOsGuide,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Build,
+                            contentDescription = "ColorOS Setup",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
             // Tab Selector
@@ -158,7 +174,7 @@ fun RuleManagerScreen(
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Text(
-                                        text = "Keep SMS and UPI listeners alive in the background.",
+                                        text = "Ensure SMS background capture is whitelisted.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                                     )
