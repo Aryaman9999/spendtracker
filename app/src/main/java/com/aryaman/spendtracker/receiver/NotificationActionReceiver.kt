@@ -13,36 +13,34 @@ import kotlinx.coroutines.launch
 class NotificationActionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == ACTION_CATEGORIZE) {
-            val txnId = intent.getLongExtra(EXTRA_TXN_ID, -1L)
-            val category = intent.getStringExtra(EXTRA_CATEGORY)
-            val merchant = intent.getStringExtra(EXTRA_MERCHANT)
+        val action = intent.action ?: return
+        val txnId = intent.getLongExtra(EXTRA_TXN_ID, -1L)
+        if (txnId == -1L) return
 
-            if (txnId != -1L && !category.isNullOrBlank()) {
-                val repository = (context.applicationContext as SpendTrackerApp).repository
+        val app = context.applicationContext as? SpendTrackerApp ?: return
+        val repository = app.repository
+        val pendingResult = goAsync()
 
-                CoroutineScope(Dispatchers.IO).launch {
-                    // Update transaction and optionally create rule for merchant
-                    repository.setCategory(
-                        transactionId = txnId,
-                        category = category,
-                        createRuleKeyword = merchant
-                    )
-                    SpendWidgetProvider.refreshAllWidgets(context)
-                }
-
-                // Dismiss the notification
-                NotificationManagerCompat.from(context).cancel(txnId.toInt())
-            }
-        } else if (intent.action == ACTION_SPLIT) {
-            val txnId = intent.getLongExtra(EXTRA_TXN_ID, -1L)
-            if (txnId != -1L) {
-                val repository = (context.applicationContext as SpendTrackerApp).repository
-                CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (action == ACTION_CATEGORIZE) {
+                    val category = intent.getStringExtra(EXTRA_CATEGORY)
+                    val merchant = intent.getStringExtra(EXTRA_MERCHANT)
+                    if (!category.isNullOrBlank()) {
+                        repository.setCategory(
+                            transactionId = txnId,
+                            category = category,
+                            createRuleKeyword = merchant
+                        )
+                        SpendWidgetProvider.refreshAllWidgets(context)
+                    }
+                } else if (action == ACTION_SPLIT) {
                     repository.toggleQuickSplit(txnId)
                     SpendWidgetProvider.refreshAllWidgets(context)
                 }
-                NotificationManagerCompat.from(context).cancel(txnId.toInt())
+            } finally {
+                NotificationHelper.dismissNotification(context, txnId)
+                pendingResult.finish()
             }
         }
     }

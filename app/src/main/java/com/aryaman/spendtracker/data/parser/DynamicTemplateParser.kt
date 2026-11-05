@@ -9,6 +9,14 @@ import java.util.Locale
 
 object DynamicTemplateParser {
 
+    private val regexCache = java.util.concurrent.ConcurrentHashMap<String, Regex>()
+
+    private fun getCompiledRegex(pattern: String): Regex {
+        return regexCache.computeIfAbsent(pattern) {
+            Regex(it, setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        }
+    }
+
     /**
      * Attempts to parse an incoming SMS using a list of user-defined templates.
      * Evaluates active templates matching the sender filter first, then any generic templates.
@@ -55,7 +63,7 @@ object DynamicTemplateParser {
         template: SmsTemplateEntity
     ): ParsedTransaction? {
         return try {
-            val regex = Regex(template.regexPattern, setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+            val regex = getCompiledRegex(template.regexPattern)
             val match = regex.find(smsBody.trim()) ?: return null
 
             // 1. Amount (Required)

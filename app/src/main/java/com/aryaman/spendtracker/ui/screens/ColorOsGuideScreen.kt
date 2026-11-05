@@ -95,17 +95,19 @@ fun ColorOsGuideScreen(onBack: () -> Unit) {
                 }
             )
 
-            // Step 2: Notification Listener
+            // Step 2: SMS & Alert Permissions
             ChecklistStepCard(
                 number = "2",
                 icon = Icons.Default.NotificationsActive,
-                title = "Notification Access (For UPI Apps)",
-                description = "Required to capture transaction push notifications from Google Pay, PhonePe, and Paytm.",
+                title = "SMS & Alert Permissions",
+                description = "Ensure SMS permissions and notifications are allowed so incoming bank transaction messages are captured reliably.",
                 statusText = "Required",
                 isCompleted = false,
-                buttonText = "Enable Notification Access",
+                buttonText = "Check Permissions",
                 onAction = {
-                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                    }
                     context.startActivity(intent)
                 }
             )

@@ -89,11 +89,17 @@ fun DashboardScreen(
                     "10PM" to (22..24)
                 )
                 val calBlock = Calendar.getInstance()
+                val hourSums = DoubleArray(25)
+                for (txn in debitTxns) {
+                    calBlock.timeInMillis = txn.timestampMillis
+                    val h = calBlock.get(Calendar.HOUR_OF_DAY).coerceIn(0, 24)
+                    hourSums[h] += txn.myActualShare
+                }
                 val bars = blocks.map { (label, hourRange) ->
-                    val sum = debitTxns.filter {
-                        calBlock.timeInMillis = it.timestampMillis
-                        calBlock.get(Calendar.HOUR_OF_DAY) in hourRange
-                    }.sumOf { it.myActualShare }
+                    var sum = 0.0
+                    for (h in hourRange) {
+                        sum += hourSums[h]
+                    }
                     BarChartItem(label, sum, isHighlighted = false)
                 }
                 val highest = debitTxns.maxByOrNull { it.myActualShare }?.let {
@@ -110,12 +116,16 @@ fun DashboardScreen(
                 )
                 val realTodayDow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
                 val calDay = Calendar.getInstance()
+                val dowSums = HashMap<Int, Double>()
+                for (txn in debitTxns) {
+                    calDay.timeInMillis = txn.timestampMillis
+                    val dow = calDay.get(Calendar.DAY_OF_WEEK)
+                    dowSums[dow] = (dowSums[dow] ?: 0.0) + txn.myActualShare
+                }
+
                 val bars = dayNames.mapIndexed { idx, name ->
                     val dow = dayConstants[idx]
-                    val sum = debitTxns.filter {
-                        calDay.timeInMillis = it.timestampMillis
-                        calDay.get(Calendar.DAY_OF_WEEK) == dow
-                    }.sumOf { it.myActualShare }
+                    val sum = dowSums[dow] ?: 0.0
                     BarChartItem(
                         label = name,
                         amount = sum,
@@ -131,13 +141,27 @@ fun DashboardScreen(
             PeriodType.MONTH -> {
                 val realToday = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
                 val cal = Calendar.getInstance()
+                // Anchor to the timestamp of the viewed period's transactions if available
+                if (debitTxns.isNotEmpty()) {
+                    cal.timeInMillis = debitTxns.first().timestampMillis
+                }
                 val totalDaysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
                 val calDay = Calendar.getInstance()
+
+                val daySumsMap = HashMap<Int, Double>()
+                val dayCatMap = HashMap<Int, HashMap<String, Double>>()
+
+                for (txn in debitTxns) {
+                    calDay.timeInMillis = txn.timestampMillis
+                    val day = calDay.get(Calendar.DAY_OF_MONTH)
+                    daySumsMap[day] = (daySumsMap[day] ?: 0.0) + txn.myActualShare
+                    val cat = txn.category ?: "Spend"
+                    val catMap = dayCatMap.getOrPut(day) { HashMap() }
+                    catMap[cat] = (catMap[cat] ?: 0.0) + txn.myActualShare
+                }
+
                 val daySums = (1..totalDaysInMonth).map { day ->
-                    val sum = debitTxns.filter {
-                        calDay.timeInMillis = it.timestampMillis
-                        calDay.get(Calendar.DAY_OF_MONTH) == day
-                    }.sumOf { it.myActualShare }
+                    val sum = daySumsMap[day] ?: 0.0
                     BarChartItem(
                         label = if (day == 1 || day == 5 || day == 10 || day == 15 || day == 20 || day == 25 || (isCurrentPeriod && day == realToday)) {
                             if (isCurrentPeriod && day == realToday) "Today" else day.toString()
@@ -151,10 +175,7 @@ fun DashboardScreen(
                 val highestDayIndex = daySums.indices.maxByOrNull { daySums[it].amount } ?: -1
                 val highest = if (highestDayIndex >= 0 && daySums[highestDayIndex].amount > 0) {
                     val dayNum = highestDayIndex + 1
-                    val topCatForDay = debitTxns.filter {
-                        calDay.timeInMillis = it.timestampMillis
-                        calDay.get(Calendar.DAY_OF_MONTH) == dayNum
-                    }.groupBy { it.category }.maxByOrNull { entry -> entry.value.sumOf { it.myActualShare } }?.key ?: "Spend"
+                    val topCatForDay = dayCatMap[dayNum]?.maxByOrNull { it.value }?.key ?: "Spend"
                     Triple("$dayNum ${SimpleDateFormat("MMM", Locale.getDefault()).format(cal.time)}", daySums[highestDayIndex].amount, topCatForDay)
                 } else null
                 Triple(daySums, avg, highest)
@@ -825,6 +846,17 @@ fun SpendingAnalyticsCard(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                 Spacer(Modifier.height(6.dp))
 
+                val budgetedAmountByCat = remember(transactions) {
+                    val map = HashMap<String, Double>()
+                    for (txn in transactions) {
+                        if (txn.direction == TransactionDirection.DEBIT && !txn.isBudgetExempt && txn.category != null) {
+                            val key = txn.category.lowercase(Locale.ROOT)
+                            map[key] = (map[key] ?: 0.0) + txn.myActualShare
+                        }
+                    }
+                    map
+                }
+
                 // Compact Category List Rows with Real Vector Icons & Budget Progress
                 categorySpends.forEachIndexed { index, cat ->
                     val percentage = if (totalSpend > 0) (cat.totalAmount / totalSpend).toFloat() else 0f
@@ -835,13 +867,7 @@ fun SpendingAnalyticsCard(
                     val monthlyBudget = catEntity?.monthlyBudget
 
                     // Calculate spend strictly counted against budget (excluding transactions with isBudgetExempt)
-                    val budgetedAmount = remember(transactions, cat.category) {
-                        transactions.filter {
-                            it.direction == TransactionDirection.DEBIT &&
-                            it.category.equals(cat.category, ignoreCase = true) &&
-                            !it.isBudgetExempt
-                        }.sumOf { it.myActualShare }
-                    }
+                    val budgetedAmount = budgetedAmountByCat[cat.category.lowercase(Locale.ROOT)] ?: 0.0
                     val exemptAmount = cat.totalAmount - budgetedAmount
 
                     val hasBudget = monthlyBudget != null && monthlyBudget > 0

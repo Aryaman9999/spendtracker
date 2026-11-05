@@ -26,10 +26,20 @@ object RuleEngine {
             val keyword = rule.keyword.trim()
             if (keyword.isEmpty()) continue
 
+            val compiledRegex = if (rule.isRegex) {
+                try {
+                    Regex(keyword, RegexOption.IGNORE_CASE)
+                } catch (_: Exception) {
+                    null
+                }
+            } else null
+
+            if (rule.isRegex && compiledRegex == null) continue
+
             for (target in targets) {
-                val matches = if (rule.isRegex) {
+                val matches = if (compiledRegex != null) {
                     try {
-                        Regex(keyword, RegexOption.IGNORE_CASE).containsMatchIn(target)
+                        compiledRegex.containsMatchIn(target)
                     } catch (_: Exception) {
                         false
                     }

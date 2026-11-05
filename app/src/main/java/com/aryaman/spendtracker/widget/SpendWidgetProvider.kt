@@ -26,8 +26,15 @@ class SpendWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        for (appWidgetId in appWidgetIds) {
-            updateWidget(context, appWidgetManager, appWidgetId)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                for (appWidgetId in appWidgetIds) {
+                    updateWidget(context, appWidgetManager, appWidgetId)
+                }
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 
@@ -38,8 +45,15 @@ class SpendWidgetProvider : AppWidgetProvider() {
             val widgetIds = appWidgetManager.getAppWidgetIds(
                 ComponentName(context, SpendWidgetProvider::class.java)
             )
-            for (id in widgetIds) {
-                updateWidget(context, appWidgetManager, id)
+            val pendingResult = goAsync()
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    for (id in widgetIds) {
+                        updateWidget(context, appWidgetManager, id)
+                    }
+                } finally {
+                    pendingResult.finish()
+                }
             }
         }
     }
@@ -86,14 +100,13 @@ class SpendWidgetProvider : AppWidgetProvider() {
             }
         }
 
-        private fun updateWidget(
+        private suspend fun updateWidget(
             context: Context,
             appWidgetManager: AppWidgetManager,
             appWidgetId: Int
         ) {
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val views = RemoteViews(context.packageName, R.layout.widget_spend_tracker)
+            try {
+                val views = RemoteViews(context.packageName, R.layout.widget_spend_tracker)
 
                     // Tap widget body → open app
                     val openAppIntent = Intent(context, MainActivity::class.java).apply {
@@ -276,12 +289,12 @@ class SpendWidgetProvider : AppWidgetProvider() {
                         appWidgetManager.updateAppWidget(appWidgetId, fallback)
                     } catch (_: Exception) {}
                 }
-            }
         }
 
         fun refreshAllWidgets(context: Context) {
             val intent = Intent(context, SpendWidgetProvider::class.java).apply {
                 action = ACTION_REFRESH
+                `package` = context.packageName
             }
             context.sendBroadcast(intent)
         }

@@ -1,5 +1,7 @@
 package com.aryaman.spendtracker.data.repository
 
+import androidx.room.withTransaction
+import com.aryaman.spendtracker.data.local.SpendDatabase
 import com.aryaman.spendtracker.data.local.dao.CategoryDao
 import com.aryaman.spendtracker.data.local.dao.CategoryRuleDao
 import com.aryaman.spendtracker.data.local.dao.SmsTemplateDao
@@ -26,7 +28,8 @@ class TransactionRepository(
     private val categoryRuleDao: CategoryRuleDao,
     private val splitEntryDao: SplitEntryDao,
     private val categoryDao: CategoryDao,
-    private val smsTemplateDao: SmsTemplateDao
+    private val smsTemplateDao: SmsTemplateDao,
+    private val database: SpendDatabase? = null
 ) {
 
     val allTransactions: Flow<List<TransactionEntity>> = transactionDao.getAllTransactions()
@@ -159,16 +162,25 @@ class TransactionRepository(
         myActualShare: Double,
         splits: List<SplitEntryEntity>
     ) {
-        val transaction = transactionDao.getTransactionById(transactionId) ?: return
+        val block: suspend () -> Unit = {
+            val transaction = transactionDao.getTransactionById(transactionId)
+            if (transaction != null) {
+                // 1. Update user's personal share
+                transactionDao.update(transaction.copy(myActualShare = myActualShare))
 
-        // 1. Update user's personal share
-        transactionDao.update(transaction.copy(myActualShare = myActualShare))
+                // 2. Replace existing split entries for this transaction
+                splitEntryDao.deleteForTransaction(transactionId)
+                val validSplits = splits.map { it.copy(transactionId = transactionId) }
+                if (validSplits.isNotEmpty()) {
+                    splitEntryDao.insertAll(validSplits)
+                }
+            }
+        }
 
-        // 2. Replace existing split entries for this transaction
-        splitEntryDao.deleteForTransaction(transactionId)
-        val validSplits = splits.map { it.copy(transactionId = transactionId) }
-        if (validSplits.isNotEmpty()) {
-            splitEntryDao.insertAll(validSplits)
+        if (database != null) {
+            database.withTransaction { block() }
+        } else {
+            block()
         }
     }
 
@@ -182,28 +194,40 @@ class TransactionRepository(
      * If not split, splits 50/50 with the most recent roommate (or "Roommate" if none).
      */
     suspend fun toggleQuickSplit(transactionId: Long): Boolean {
-        val transaction = transactionDao.getTransactionById(transactionId) ?: return false
-        val currentSplits = splitEntryDao.getSplitsForTransactionList(transactionId)
-        val isCurrentlySplit = transaction.myActualShare != transaction.amount || currentSplits.isNotEmpty()
+        val block: suspend () -> Boolean = {
+            val transaction = transactionDao.getTransactionById(transactionId)
+            if (transaction == null) {
+                false
+            } else {
+                val currentSplits = splitEntryDao.getSplitsForTransactionList(transactionId)
+                val isCurrentlySplit = transaction.myActualShare != transaction.amount || currentSplits.isNotEmpty()
 
-        if (isCurrentlySplit) {
-            transactionDao.update(transaction.copy(myActualShare = transaction.amount))
-            splitEntryDao.deleteForTransaction(transactionId)
-            return false
+                if (isCurrentlySplit) {
+                    transactionDao.update(transaction.copy(myActualShare = transaction.amount))
+                    splitEntryDao.deleteForTransaction(transactionId)
+                    false
+                } else {
+                    val half = transaction.amount / 2.0
+                    val recentRoommate = splitEntryDao.getMostRecentRoommateName() ?: "Roommate"
+                    transactionDao.update(transaction.copy(myActualShare = half))
+                    splitEntryDao.deleteForTransaction(transactionId)
+                    splitEntryDao.insert(
+                        SplitEntryEntity(
+                            transactionId = transactionId,
+                            roommateName = recentRoommate,
+                            amountOwed = half,
+                            settled = false
+                        )
+                    )
+                    true
+                }
+            }
+        }
+
+        return if (database != null) {
+            database.withTransaction { block() }
         } else {
-            val half = transaction.amount / 2.0
-            val recentRoommate = splitEntryDao.getMostRecentRoommateName() ?: "Roommate"
-            transactionDao.update(transaction.copy(myActualShare = half))
-            splitEntryDao.deleteForTransaction(transactionId)
-            splitEntryDao.insert(
-                SplitEntryEntity(
-                    transactionId = transactionId,
-                    roommateName = recentRoommate,
-                    amountOwed = half,
-                    settled = false
-                )
-            )
-            return true
+            block()
         }
     }
 

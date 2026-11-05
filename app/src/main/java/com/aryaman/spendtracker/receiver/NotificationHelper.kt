@@ -101,5 +101,11 @@ object NotificationHelper {
         }
     }
 
+    fun dismissNotification(context: Context, transactionId: Long) {
+        try {
+            NotificationManagerCompat.from(context).cancel(transactionId.toInt())
+        } catch (_: Exception) {}
+    }
+
     const val GROUP_SPEND_REVIEW = "com.aryaman.spendtracker.SPEND_REVIEW_GROUP"
 }

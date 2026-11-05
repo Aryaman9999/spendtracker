@@ -51,11 +51,11 @@ versionName=$vName
 "@ | Out-File -FilePath $versionPropsPath -Encoding utf8
 
 # 2. Build APK
-Write-Host "`n[+] Compiling and building debug APK..." -ForegroundColor Cyan
+Write-Host "`n[+] Compiling and building optimized release APK..." -ForegroundColor Cyan
 $env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot"
 $env:ANDROID_HOME = "C:\Android\Sdk"
 
-& .\gradlew.bat assembleDebug
+& .\gradlew.bat assembleRelease
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[-] Build failed!" -ForegroundColor Red
@@ -63,7 +63,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # 3. Copy APK to Project Root
-$builtApk = Join-Path $ProjectDir "app\build\outputs\apk\debug\app-debug.apk"
+$builtApk = Join-Path $ProjectDir "app\build\outputs\apk\release\app-release.apk"
 $rootApk = Join-Path $ProjectDir "SpendTracker.apk"
 $versionedApk = Join-Path $ProjectDir "SpendTracker-v$vName.apk"
 Copy-Item $builtApk $rootApk -Force

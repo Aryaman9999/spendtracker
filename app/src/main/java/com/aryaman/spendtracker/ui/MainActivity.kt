@@ -1,6 +1,7 @@
 package com.aryaman.spendtracker.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.aryaman.spendtracker.SpendTrackerApp
 import com.aryaman.spendtracker.data.local.entity.SmsTemplateEntity
+import com.aryaman.spendtracker.receiver.NotificationHelper
 import com.aryaman.spendtracker.widget.SpendWidgetProvider
 import com.aryaman.spendtracker.ui.screens.*
 import com.aryaman.spendtracker.ui.theme.SpendTrackerTheme
@@ -72,7 +74,11 @@ class MainActivity : ComponentActivity() {
         val app = applicationContext as SpendTrackerApp
         val repository = app.repository
 
-        val hasReviewIntent = intent.getLongExtra("EXTRA_TRANSACTION_ID", -1L) != -1L
+        val reviewTxnId = intent.getLongExtra("EXTRA_TRANSACTION_ID", -1L)
+        val hasReviewIntent = reviewTxnId != -1L
+        if (hasReviewIntent) {
+            NotificationHelper.dismissNotification(this, reviewTxnId)
+        }
 
         setContent {
             SpendTrackerTheme {
@@ -277,6 +283,7 @@ class MainActivity : ComponentActivity() {
                                     selectedCategoryFilter = selectedCategoryFilter,
                                     onClearCategoryFilter = { selectedCategoryFilter = null },
                                     onCategorize = { id, cat, createRule ->
+                                        NotificationHelper.dismissNotification(this@MainActivity, id)
                                         scope.launch(Dispatchers.IO) {
                                             val txn = transactions.find { it.id == id }
                                             repository.setCategory(
@@ -288,12 +295,14 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     onSplit = { id, myActualShare, splitsList ->
+                                        NotificationHelper.dismissNotification(this@MainActivity, id)
                                         scope.launch(Dispatchers.IO) {
                                             repository.splitTransaction(id, myActualShare, splitsList)
                                             SpendWidgetProvider.refreshAllWidgets(this@MainActivity)
                                         }
                                     },
                                     onToggleSplit = { id ->
+                                        NotificationHelper.dismissNotification(this@MainActivity, id)
                                         scope.launch(Dispatchers.IO) {
                                             repository.toggleQuickSplit(id)
                                             SpendWidgetProvider.refreshAllWidgets(this@MainActivity)
@@ -316,6 +325,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     onDelete = { id ->
+                                        NotificationHelper.dismissNotification(this@MainActivity, id)
                                         scope.launch(Dispatchers.IO) {
                                             repository.deleteTransaction(id)
                                             SpendWidgetProvider.refreshAllWidgets(this@MainActivity)
@@ -430,6 +440,15 @@ class MainActivity : ComponentActivity() {
 
         if (missing.isNotEmpty()) {
             requestPermissionsLauncher.launch(missing.toTypedArray())
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val reviewTxnId = intent.getLongExtra("EXTRA_TRANSACTION_ID", -1L)
+        if (reviewTxnId != -1L) {
+            NotificationHelper.dismissNotification(this, reviewTxnId)
         }
     }
 

@@ -25,7 +25,8 @@ class SpendTrackerApp : Application() {
             categoryRuleDao = database.categoryRuleDao(),
             splitEntryDao = database.splitEntryDao(),
             categoryDao = database.categoryDao(),
-            smsTemplateDao = database.smsTemplateDao()
+            smsTemplateDao = database.smsTemplateDao(),
+            database = database
         )
 
         createNotificationChannels()
