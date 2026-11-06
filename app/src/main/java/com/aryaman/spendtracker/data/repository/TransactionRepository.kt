@@ -1,5 +1,11 @@
 package com.aryaman.spendtracker.data.repository
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.provider.Telephony
+import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.room.withTransaction
 import com.aryaman.spendtracker.data.local.SpendDatabase
 import com.aryaman.spendtracker.data.local.dao.CategoryDao
@@ -13,9 +19,22 @@ import com.aryaman.spendtracker.data.local.entity.SmsTemplateEntity
 import com.aryaman.spendtracker.data.local.entity.SplitEntryEntity
 import com.aryaman.spendtracker.data.local.entity.TransactionEntity
 import com.aryaman.spendtracker.data.model.TransactionStatus
+import com.aryaman.spendtracker.data.parser.DynamicTemplateParser
 import com.aryaman.spendtracker.data.parser.ParsedTransaction
 import com.aryaman.spendtracker.domain.RuleEngine
+import com.aryaman.spendtracker.widget.SpendWidgetProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
+
+data class SmsBacktrackSummary(
+    val totalSmsExamined: Int,
+    val matchedTransactions: Int,
+    val newlyInserted: Int,
+    val autoCategorized: Int,
+    val uncategorized: Int,
+    val duplicatesOrMerged: Int
+)
 
 sealed class TransactionProcessResult {
     data class Inserted(val id: Long, val status: TransactionStatus, val category: String?, val isPendingReview: Boolean) : TransactionProcessResult()
@@ -274,4 +293,115 @@ class TransactionRepository(
     fun getBudgetSpendByCategory(start: Long, end: Long) = transactionDao.getBudgetSpendByCategory(start, end)
     fun getSpendByCategory(start: Long, end: Long) = transactionDao.getSpendByCategory(start, end)
     fun getTotalSpend(start: Long, end: Long) = transactionDao.getTotalSpendInWindow(start, end)
+
+    /**
+     * Scans past SMS messages from device inbox within lookbackDays (default 30).
+     * Parses them against active bank formats, deduplicates against existing records,
+     * matches against category rules (placing unmatched ones under Uncategorized / PENDING_REVIEW),
+     * and inserts new records into the database.
+     */
+    suspend fun backtrackSms(
+        context: Context,
+        lookbackDays: Int = 30,
+        targetTemplateId: Long? = null,
+        onProgress: (scanned: Int, matched: Int) -> Unit = { _, _ -> }
+    ): SmsBacktrackSummary = withContext(Dispatchers.IO) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            return@withContext SmsBacktrackSummary(0, 0, 0, 0, 0, 0)
+        }
+
+        val days = lookbackDays.coerceIn(1, 365)
+        val cutoffMillis = System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
+
+        val templates = if (targetTemplateId != null) {
+            val single = smsTemplateDao.getTemplateById(targetTemplateId)
+            if (single != null) listOf(single) else smsTemplateDao.getActiveTemplatesList()
+        } else {
+            smsTemplateDao.getActiveTemplatesList()
+        }
+
+        if (templates.isEmpty()) {
+            return@withContext SmsBacktrackSummary(0, 0, 0, 0, 0, 0)
+        }
+
+        var totalExamined = 0
+        var matchedCount = 0
+        var newlyInserted = 0
+        var autoCategorized = 0
+        var uncategorized = 0
+        var duplicates = 0
+
+        val uri = Telephony.Sms.Inbox.CONTENT_URI
+        val projection = arrayOf(
+            Telephony.Sms._ID,
+            Telephony.Sms.ADDRESS,
+            Telephony.Sms.BODY,
+            Telephony.Sms.DATE
+        )
+        val selection = "${Telephony.Sms.DATE} >= ?"
+        val selectionArgs = arrayOf(cutoffMillis.toString())
+        val sortOrder = "${Telephony.Sms.DATE} ASC" // Process chronologically
+
+        try {
+            context.contentResolver.query(uri, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
+                val addressCol = cursor.getColumnIndex(Telephony.Sms.ADDRESS)
+                val bodyCol = cursor.getColumnIndex(Telephony.Sms.BODY)
+                val dateCol = cursor.getColumnIndex(Telephony.Sms.DATE)
+
+                while (cursor.moveToNext()) {
+                    totalExamined++
+                    val sender = if (addressCol >= 0) cursor.getString(addressCol) ?: "" else ""
+                    val body = if (bodyCol >= 0) cursor.getString(bodyCol) ?: "" else ""
+                    val timestamp = if (dateCol >= 0) cursor.getLong(dateCol) else System.currentTimeMillis()
+
+                    if (body.isBlank()) continue
+
+                    val parsed = DynamicTemplateParser.parse(
+                        smsBody = body,
+                        sender = sender,
+                        smsTimestamp = timestamp,
+                        templates = templates
+                    )
+
+                    if (parsed != null) {
+                        matchedCount++
+                        val result = processParsedTransaction(parsed)
+                        when (result) {
+                            is TransactionProcessResult.Inserted -> {
+                                newlyInserted++
+                                if (result.isPendingReview) {
+                                    uncategorized++
+                                } else {
+                                    autoCategorized++
+                                }
+                            }
+                            is TransactionProcessResult.Merged -> {
+                                duplicates++
+                            }
+                            is TransactionProcessResult.Ignored -> {}
+                        }
+                    }
+
+                    if (totalExamined % 10 == 0) {
+                        onProgress(totalExamined, matchedCount)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("TransactionRepo", "Error backtracking past SMS", e)
+        }
+
+        if (newlyInserted > 0) {
+            SpendWidgetProvider.refreshAllWidgets(context)
+        }
+
+        SmsBacktrackSummary(
+            totalSmsExamined = totalExamined,
+            matchedTransactions = matchedCount,
+            newlyInserted = newlyInserted,
+            autoCategorized = autoCategorized,
+            uncategorized = uncategorized,
+            duplicatesOrMerged = duplicates
+        )
+    }
 }

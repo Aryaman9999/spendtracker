@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -51,7 +52,8 @@ fun RuleManagerScreen(
     onToggleTemplateActive: (Long, Boolean) -> Unit = { _, _ -> },
     onUpdateCategoryBudget: (categoryName: String, budget: Double?) -> Unit = { _, _ -> },
     onNavigateToColorOsGuide: () -> Unit,
-    onCheckUpdate: () -> Unit = {}
+    onCheckUpdate: () -> Unit = {},
+    onOpenBacktrackDialog: (templateId: Long?) -> Unit = {}
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var showAddRuleDialog by remember { mutableStateOf(false) }
@@ -322,6 +324,47 @@ fun RuleManagerScreen(
                     }
 
                     item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            border = BorderStroke(1.dp, PrimaryIndigo.copy(alpha = 0.25f)),
+                            onClick = { onOpenBacktrackDialog(null) },
+                            elevation = CardDefaults.cardElevation(0.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "Scan Past SMS (Backtrack)",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = "Import transactions from the past 30 days for active formats. Unmatched items are placed in Uncategorized.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(Modifier.width(16.dp))
+                                FilledTonalButton(onClick = { onOpenBacktrackDialog(null) }) {
+                                    Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Scan")
+                                }
+                            }
+                        }
+                    }
+
+                    item {
                         Text(
                             text = "Custom Bank Formats (${templates.size})",
                             style = MaterialTheme.typography.titleMedium,
@@ -472,6 +515,12 @@ fun RuleManagerScreen(
                                         horizontalArrangement = Arrangement.End,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        TextButton(onClick = { onOpenBacktrackDialog(template.id) }) {
+                                            Icon(Icons.Default.History, contentDescription = "Scan SMS", modifier = Modifier.size(15.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("Scan SMS")
+                                        }
+                                        Spacer(Modifier.width(4.dp))
                                         TextButton(onClick = { onEditTemplate(template) }) {
                                             Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(15.dp))
                                             Spacer(Modifier.width(4.dp))

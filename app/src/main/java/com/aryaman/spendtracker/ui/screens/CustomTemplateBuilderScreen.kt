@@ -1,5 +1,6 @@
 package com.aryaman.spendtracker.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aryaman.spendtracker.data.local.entity.SmsTemplateEntity
@@ -38,12 +40,15 @@ import java.util.Locale
 fun CustomTemplateBuilderScreen(
     templateToEdit: SmsTemplateEntity? = null,
     onBack: () -> Unit,
-    onSaveTemplate: (SmsTemplateEntity) -> Unit
+    onSaveTemplate: (SmsTemplateEntity, lookbackDays: Int?) -> Unit
 ) {
     var bankName by remember { mutableStateOf(templateToEdit?.bankName ?: "") }
     var senderFilter by remember { mutableStateOf(templateToEdit?.senderFilter ?: "") }
     var sampleText by remember { mutableStateOf(templateToEdit?.sampleText ?: "") }
     var isCreditCard by remember { mutableStateOf(templateToEdit?.isCreditCard ?: false) }
+
+    var shouldScanPastSms by remember { mutableStateOf(templateToEdit == null) }
+    var lookbackDaysText by remember { mutableStateOf("30") }
 
     var amountSnippet by remember { mutableStateOf("") }
     var merchantSnippet by remember { mutableStateOf("") }
@@ -457,6 +462,69 @@ fun CustomTemplateBuilderScreen(
                 }
             }
 
+            // Scan Past SMS Backtrack Option
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                border = BorderStroke(1.dp, PrimaryIndigo.copy(alpha = 0.25f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Scan Past SMS Messages",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Import existing past transactions using this format immediately after saving.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(
+                            checked = shouldScanPastSms,
+                            onCheckedChange = { shouldScanPastSms = it }
+                        )
+                    }
+
+                    if (shouldScanPastSms) {
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = lookbackDaysText,
+                            onValueChange = { lookbackDaysText = it.filter { ch -> ch.isDigit() }.take(3) },
+                            label = { Text("Look back (days)") },
+                            placeholder = { Text("30") },
+                            suffix = { Text("days") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(top = 6.dp)
+                        ) {
+                            listOf("7", "14", "30", "60", "90").forEach { d ->
+                                FilterChip(
+                                    selected = lookbackDaysText == d,
+                                    onClick = { lookbackDaysText = d },
+                                    label = { Text("${d}d", fontSize = 11.sp) },
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             Spacer(Modifier.height(8.dp))
 
             // Save Button
@@ -474,7 +542,8 @@ fun CustomTemplateBuilderScreen(
                         isActive = templateToEdit?.isActive ?: true,
                         createdAt = templateToEdit?.createdAt ?: System.currentTimeMillis()
                     )
-                    onSaveTemplate(template)
+                    val daysToBacktrack = if (shouldScanPastSms) (lookbackDaysText.toIntOrNull() ?: 30) else null
+                    onSaveTemplate(template, daysToBacktrack)
                 },
                 enabled = synthesisResult is SynthesisResult.Success && bankName.isNotBlank(),
                 modifier = Modifier

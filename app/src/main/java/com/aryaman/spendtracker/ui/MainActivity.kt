@@ -29,7 +29,9 @@ import androidx.core.content.ContextCompat
 import com.aryaman.spendtracker.BuildConfig
 import com.aryaman.spendtracker.SpendTrackerApp
 import com.aryaman.spendtracker.data.local.entity.SmsTemplateEntity
+import com.aryaman.spendtracker.data.repository.SmsBacktrackSummary
 import com.aryaman.spendtracker.receiver.NotificationHelper
+import com.aryaman.spendtracker.ui.components.BacktrackSmsDialog
 import com.aryaman.spendtracker.util.AppUpdateInfo
 import com.aryaman.spendtracker.util.UpdateChecker
 import com.aryaman.spendtracker.widget.SpendWidgetProvider
@@ -98,6 +100,13 @@ class MainActivity : ComponentActivity() {
                     var availableUpdate by remember { mutableStateOf<AppUpdateInfo?>(null) }
                     var isDownloadingUpdate by remember { mutableStateOf(false) }
                     var downloadProgress by remember { mutableIntStateOf(0) }
+
+                    // SMS Backtracking (Importing past transactions) state
+                    var showBacktrackDialog by remember { mutableStateOf(false) }
+                    var backtrackTargetTemplateId by remember { mutableStateOf<Long?>(null) }
+                    var isBacktracking by remember { mutableStateOf(false) }
+                    var backtrackProgress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+                    var backtrackSummary by remember { mutableStateOf<SmsBacktrackSummary?>(null) }
 
                     // Automatic Background Check for OTA Updates via GitHub Releases (throttled & non-intrusive)
                     LaunchedEffect(Unit) {
@@ -424,6 +433,12 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                         }
+                                    },
+                                    onOpenBacktrackDialog = { templateId ->
+                                        backtrackTargetTemplateId = templateId
+                                        backtrackSummary = null
+                                        backtrackProgress = null
+                                        showBacktrackDialog = true
                                     }
                                 )
 
@@ -445,15 +460,38 @@ class MainActivity : ComponentActivity() {
                                             templateToEdit = null
                                             currentScreen = Screen.RULES
                                         },
-                                        onSaveTemplate = { template ->
+                                        onSaveTemplate = { template, backtrackDays ->
                                             scope.launch(Dispatchers.IO) {
-                                                if (template.id > 0) {
+                                                val templateId = if (template.id > 0) {
                                                     repository.updateTemplate(template)
+                                                    template.id
                                                 } else {
                                                     repository.addTemplate(template)
                                                 }
                                                 templateToEdit = null
                                                 currentScreen = Screen.RULES
+
+                                                if (backtrackDays != null && backtrackDays > 0) {
+                                                    withContext(Dispatchers.Main) {
+                                                        backtrackTargetTemplateId = templateId
+                                                        backtrackSummary = null
+                                                        backtrackProgress = Pair(0, 0)
+                                                        showBacktrackDialog = true
+                                                        isBacktracking = true
+                                                    }
+                                                    val summary = repository.backtrackSms(
+                                                        context = this@MainActivity,
+                                                        lookbackDays = backtrackDays,
+                                                        targetTemplateId = templateId,
+                                                        onProgress = { s, m ->
+                                                            backtrackProgress = Pair(s, m)
+                                                        }
+                                                    )
+                                                    withContext(Dispatchers.Main) {
+                                                        isBacktracking = false
+                                                        backtrackSummary = summary
+                                                    }
+                                                }
                                             }
                                         }
                                     )
@@ -547,6 +585,43 @@ class MainActivity : ComponentActivity() {
                                             Text("Later")
                                         }
                                     }
+                                }
+                            )
+                        }
+
+                        // Backtrack Past SMS Dialog
+                        if (showBacktrackDialog) {
+                            BacktrackSmsDialog(
+                                templates = templates,
+                                initialTemplateId = backtrackTargetTemplateId,
+                                isScanning = isBacktracking,
+                                scanProgress = backtrackProgress,
+                                scanSummary = backtrackSummary,
+                                onDismiss = {
+                                    showBacktrackDialog = false
+                                    backtrackSummary = null
+                                    backtrackProgress = null
+                                },
+                                onStartScan = { days, templateId ->
+                                    isBacktracking = true
+                                    backtrackProgress = Pair(0, 0)
+                                    backtrackSummary = null
+                                    scope.launch {
+                                        val summary = repository.backtrackSms(
+                                            context = this@MainActivity,
+                                            lookbackDays = days,
+                                            targetTemplateId = templateId,
+                                            onProgress = { s, m ->
+                                                backtrackProgress = Pair(s, m)
+                                            }
+                                        )
+                                        isBacktracking = false
+                                        backtrackSummary = summary
+                                    }
+                                },
+                                onViewTransactions = {
+                                    filterPendingInTransactions = true
+                                    currentScreen = Screen.TRANSACTIONS
                                 }
                             )
                         }
