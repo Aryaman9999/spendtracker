@@ -52,6 +52,30 @@ enum class TransactionFilter {
     SPLIT
 }
 
+fun getCardIdentifier(transaction: TransactionEntity): String {
+    val info = transaction.accountInfo?.trim()
+    if (!info.isNullOrBlank()) {
+        val clean = info
+            .replace(Regex("""\b(Credit\s+Card|Card|A/C)\b""", RegexOption.IGNORE_CASE), "")
+            .trim()
+        if (clean.isNotBlank()) return clean
+    }
+    val cardRegex = Regex("""(?:card\s+(?:ending\s+)?|using\s+(?:your\s+)?|on\s+)(\w+(?:\s+\w+)?\s+Credit\s+Card|\*?\d{4})""", RegexOption.IGNORE_CASE)
+    val match = cardRegex.find(transaction.rawText)
+    if (match != null) {
+        val card = match.groupValues[1]
+            .replace(Regex("""\b(Credit\s+Card|Card)\b""", RegexOption.IGNORE_CASE), "")
+            .trim()
+        if (card.isNotBlank()) return card
+    }
+    if (transaction.rawText.contains("Pixel Play", ignoreCase = true)) return "Pixel Play"
+    if (transaction.rawText.contains("HDFC", ignoreCase = true)) return "HDFC Card"
+    if (transaction.rawText.contains("SBI", ignoreCase = true)) return "SBI Card"
+    if (transaction.rawText.contains("ICICI", ignoreCase = true)) return "ICICI Card"
+    if (transaction.rawText.contains("Axis", ignoreCase = true)) return "Axis Card"
+    return "Credit Card"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionsScreen(
@@ -72,6 +96,7 @@ fun TransactionsScreen(
     var selectedFilter by remember {
         mutableStateOf(if (initialFilterPending) TransactionFilter.PENDING else TransactionFilter.ALL)
     }
+    var selectedCardFilter by remember { mutableStateOf<String?>(null) }
 
     var transactionToCategorize by remember { mutableStateOf<TransactionEntity?>(null) }
     var transactionToSplit by remember { mutableStateOf<TransactionEntity?>(null) }
@@ -79,10 +104,24 @@ fun TransactionsScreen(
     // Group splits by transactionId for instant O(1) lookup
     val splitsByTxnId = remember(splits) { splits.groupBy { it.transactionId } }
 
-    val filteredList = remember(transactions, selectedFilter, selectedCategoryFilter) {
+    val availableCards = remember(transactions) {
+        transactions.filter { it.isCreditCard }
+            .map { getCardIdentifier(it) }
+            .distinct()
+            .sorted()
+    }
+
+    val filteredList = remember(transactions, selectedFilter, selectedCategoryFilter, selectedCardFilter) {
         val base = when (selectedFilter) {
             TransactionFilter.ALL -> transactions
-            TransactionFilter.CREDIT_CARD -> transactions.filter { it.isCreditCard }
+            TransactionFilter.CREDIT_CARD -> {
+                val ccList = transactions.filter { it.isCreditCard }
+                if (selectedCardFilter != null) {
+                    ccList.filter { getCardIdentifier(it).equals(selectedCardFilter, ignoreCase = true) }
+                } else {
+                    ccList
+                }
+            }
             TransactionFilter.PENDING -> transactions.filter { it.status == TransactionStatus.PENDING_REVIEW }
             TransactionFilter.AUTO_MATCHED -> transactions.filter { it.status == TransactionStatus.AUTO_MATCHED }
             TransactionFilter.SPLIT -> transactions.filter { it.myActualShare != it.amount }
@@ -197,8 +236,16 @@ fun TransactionsScreen(
                     val ccCount = transactions.count { it.isCreditCard }
                     FilterChip(
                         selected = selectedFilter == TransactionFilter.CREDIT_CARD,
-                        onClick = { selectedFilter = TransactionFilter.CREDIT_CARD },
-                        label = { Text("HDFC CC ($ccCount)") },
+                        onClick = {
+                            if (selectedFilter != TransactionFilter.CREDIT_CARD) {
+                                selectedFilter = TransactionFilter.CREDIT_CARD
+                                selectedCardFilter = null
+                            } else {
+                                selectedFilter = TransactionFilter.ALL
+                                selectedCardFilter = null
+                            }
+                        },
+                        label = { Text("Credit Cards ($ccCount)") },
                         leadingIcon = {
                             Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(13.dp))
                         },
@@ -234,6 +281,62 @@ fun TransactionsScreen(
                         label = { Text("Splits ($splitCount)") },
                         shape = RoundedCornerShape(10.dp)
                     )
+                }
+            }
+
+            // Multi-Card Filter Bar (Shown when Credit Cards filter is active)
+            if (selectedFilter == TransactionFilter.CREDIT_CARD && availableCards.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF673AB7).copy(alpha = 0.08f)
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text(
+                            text = "FILTER BY CARD",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF9575CD),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val totalCc = transactions.count { it.isCreditCard }
+                            item {
+                                FilterChip(
+                                    selected = selectedCardFilter == null,
+                                    onClick = { selectedCardFilter = null },
+                                    label = { Text("All Cards ($totalCc)", fontSize = 11.sp) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFF673AB7).copy(alpha = 0.25f),
+                                        selectedLabelColor = Color(0xFFD1C4E9)
+                                    )
+                                )
+                            }
+                            items(availableCards) { cardName ->
+                                val cardCount = transactions.count { it.isCreditCard && getCardIdentifier(it).equals(cardName, ignoreCase = true) }
+                                FilterChip(
+                                    selected = selectedCardFilter == cardName,
+                                    onClick = { selectedCardFilter = cardName },
+                                    label = { Text("$cardName ($cardCount)", fontSize = 11.sp) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    leadingIcon = {
+                                        Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(11.dp))
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFF673AB7).copy(alpha = 0.25f),
+                                        selectedLabelColor = Color(0xFFD1C4E9)
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -428,6 +531,7 @@ fun TransactionDetailCard(
                         modifier = Modifier.padding(bottom = 3.dp)
                     ) {
                         if (transaction.isCreditCard) {
+                            val cardLabel = getCardIdentifier(transaction)
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = Color(0xFF673AB7).copy(alpha = 0.18f),
@@ -445,7 +549,7 @@ fun TransactionDetailCard(
                                     )
                                     Spacer(Modifier.width(2.dp))
                                     Text(
-                                        text = "CC",
+                                        text = if (cardLabel.isNotBlank() && cardLabel != "Credit Card") cardLabel else "CC",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color(0xFFD1C4E9),
                                         fontWeight = FontWeight.ExtraBold,

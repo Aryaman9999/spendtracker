@@ -103,7 +103,8 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) {
                         try {
                             if (UpdateChecker.shouldAutoCheck(this@MainActivity)) {
-                                val update = UpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
+                                val currentVer = UpdateChecker.getAppVersionName(this@MainActivity)
+                                val update = UpdateChecker.checkForUpdate(currentVer)
                                 UpdateChecker.recordAutoCheck(this@MainActivity)
                                 if (update != null && update.isUpdateAvailable) {
                                     if (!UpdateChecker.isVersionDismissed(this@MainActivity, update.latestVersion)) {
@@ -409,14 +410,15 @@ class MainActivity : ComponentActivity() {
                                     onCheckUpdate = {
                                         scope.launch(Dispatchers.IO) {
                                             UpdateChecker.clearDismissedVersion(this@MainActivity)
-                                            val update = UpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
+                                            val currentVer = UpdateChecker.getAppVersionName(this@MainActivity)
+                                            val update = UpdateChecker.checkForUpdate(currentVer)
                                             withContext(Dispatchers.Main) {
                                                 if (update != null && update.isUpdateAvailable) {
                                                     availableUpdate = update
                                                 } else {
                                                     android.widget.Toast.makeText(
                                                         this@MainActivity,
-                                                        "SpendTracker is up to date (v${BuildConfig.VERSION_NAME})",
+                                                        "SpendTracker is up to date (v$currentVer)",
                                                         android.widget.Toast.LENGTH_SHORT
                                                     ).show()
                                                 }

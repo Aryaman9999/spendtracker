@@ -36,6 +36,23 @@ object UpdateChecker {
     private const val AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L // 24 hours
 
     /**
+     * Gets the actual installed version name from Android PackageManager.
+     */
+    fun getAppVersionName(context: Context): String {
+        return try {
+            val pInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+            pInfo.versionName ?: com.aryaman.spendtracker.BuildConfig.VERSION_NAME
+        } catch (_: Exception) {
+            com.aryaman.spendtracker.BuildConfig.VERSION_NAME
+        }
+    }
+
+    /**
      * Determines if a background check should run (rate limited to once every 24h).
      */
     fun shouldAutoCheck(context: Context): Boolean {
