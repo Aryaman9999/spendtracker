@@ -97,18 +97,6 @@ fun RuleManagerScreen(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
-                        onClick = onCheckUpdate,
-                        modifier = Modifier.size(34.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.CloudDownload,
-                            contentDescription = "Check for Updates",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(4.dp))
-                    IconButton(
                         onClick = onNavigateToColorOsGuide,
                         modifier = Modifier.size(34.dp)
                     ) {
@@ -571,6 +559,17 @@ fun RuleManagerScreen(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
+                        Spacer(Modifier.height(4.dp))
+                        TextButton(
+                            onClick = onCheckUpdate,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "Check for updates",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
 

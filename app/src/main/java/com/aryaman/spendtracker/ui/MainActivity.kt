@@ -9,11 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Group
@@ -25,6 +21,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -99,13 +96,20 @@ class MainActivity : ComponentActivity() {
                     var selectedCategoryFilter by remember { mutableStateOf<String?>(null) }
                     var templateToEdit by remember { mutableStateOf<SmsTemplateEntity?>(null) }
                     var availableUpdate by remember { mutableStateOf<AppUpdateInfo?>(null) }
+                    var isDownloadingUpdate by remember { mutableStateOf(false) }
+                    var downloadProgress by remember { mutableIntStateOf(0) }
 
-                    // Automatic Background Check for OTA Updates via GitHub Releases
+                    // Automatic Background Check for OTA Updates via GitHub Releases (throttled & non-intrusive)
                     LaunchedEffect(Unit) {
                         try {
-                            val update = UpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
-                            if (update != null && update.isUpdateAvailable) {
-                                availableUpdate = update
+                            if (UpdateChecker.shouldAutoCheck(this@MainActivity)) {
+                                val update = UpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
+                                UpdateChecker.recordAutoCheck(this@MainActivity)
+                                if (update != null && update.isUpdateAvailable) {
+                                    if (!UpdateChecker.isVersionDismissed(this@MainActivity, update.latestVersion)) {
+                                        availableUpdate = update
+                                    }
+                                }
                             }
                         } catch (_: Exception) {}
                     }
@@ -404,6 +408,7 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onCheckUpdate = {
                                         scope.launch(Dispatchers.IO) {
+                                            UpdateChecker.clearDismissedVersion(this@MainActivity)
                                             val update = UpdateChecker.checkForUpdate(BuildConfig.VERSION_NAME)
                                             withContext(Dispatchers.Main) {
                                                 if (update != null && update.isUpdateAvailable) {
@@ -457,7 +462,12 @@ class MainActivity : ComponentActivity() {
                         // In-App OTA Update Dialog (1-Tap Experience)
                         availableUpdate?.let { update ->
                             AlertDialog(
-                                onDismissRequest = { availableUpdate = null },
+                                onDismissRequest = {
+                                    if (!isDownloadingUpdate) {
+                                        UpdateChecker.markVersionDismissed(this@MainActivity, update.latestVersion)
+                                        availableUpdate = null
+                                    }
+                                },
                                 title = {
                                     Text(
                                         text = "Update Available: v${update.latestVersion}",
@@ -485,25 +495,55 @@ class MainActivity : ComponentActivity() {
                                                 )
                                             }
                                         }
+                                        if (isDownloadingUpdate) {
+                                            Spacer(Modifier.height(4.dp))
+                                            LinearProgressIndicator(
+                                                progress = { downloadProgress / 100f },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            Text(
+                                                text = if (downloadProgress > 0) "Downloading update: $downloadProgress%" else "Starting download...",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
                                     }
                                 },
                                 confirmButton = {
                                     Button(
                                         onClick = {
-                                            UpdateChecker.startDownloadAndInstall(
-                                                context = this@MainActivity,
-                                                apkUrl = update.downloadUrl,
-                                                version = update.latestVersion
-                                            )
-                                            availableUpdate = null
-                                        }
+                                            isDownloadingUpdate = true
+                                            downloadProgress = 0
+                                            scope.launch {
+                                                val result = UpdateChecker.downloadAndInstall(
+                                                    context = this@MainActivity,
+                                                    apkUrl = update.downloadUrl,
+                                                    version = update.latestVersion,
+                                                    onProgress = { progress ->
+                                                        downloadProgress = progress
+                                                    }
+                                                )
+                                                isDownloadingUpdate = false
+                                                if (result.isSuccess) {
+                                                    availableUpdate = null
+                                                }
+                                            }
+                                        },
+                                        enabled = !isDownloadingUpdate
                                     ) {
-                                        Text("Download & Install", fontWeight = FontWeight.Bold)
+                                        Text(if (isDownloadingUpdate) "Downloading..." else "Download & Install", fontWeight = FontWeight.Bold)
                                     }
                                 },
                                 dismissButton = {
-                                    TextButton(onClick = { availableUpdate = null }) {
-                                        Text("Later")
+                                    if (!isDownloadingUpdate) {
+                                        TextButton(
+                                            onClick = {
+                                                UpdateChecker.markVersionDismissed(this@MainActivity, update.latestVersion)
+                                                availableUpdate = null
+                                            }
+                                        ) {
+                                            Text("Later")
+                                        }
                                     }
                                 }
                             )

@@ -1,23 +1,19 @@
 package com.aryaman.spendtracker.util
 
-import android.app.DownloadManager
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
@@ -34,6 +30,53 @@ object UpdateChecker {
 
     private const val TAG = "UpdateChecker"
     private const val GITHUB_REPO_API = "https://api.github.com/repos/Aryaman9999/spendtracker/releases/latest"
+    private const val PREFS_NAME = "spendtracker_update_prefs"
+    private const val KEY_LAST_CHECK_TIME = "last_auto_check_time"
+    private const val KEY_DISMISSED_VERSION = "dismissed_version"
+    private const val AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L // 24 hours
+
+    /**
+     * Determines if a background check should run (rate limited to once every 24h).
+     */
+    fun shouldAutoCheck(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val lastCheck = prefs.getLong(KEY_LAST_CHECK_TIME, 0L)
+        val now = System.currentTimeMillis()
+        return (now - lastCheck) >= AUTO_CHECK_INTERVAL_MS
+    }
+
+    /**
+     * Records the timestamp of an automatic background check.
+     */
+    fun recordAutoCheck(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putLong(KEY_LAST_CHECK_TIME, System.currentTimeMillis()).apply()
+    }
+
+    /**
+     * Checks if the user dismissed this specific version.
+     */
+    fun isVersionDismissed(context: Context, version: String): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val dismissed = prefs.getString(KEY_DISMISSED_VERSION, null)
+        return dismissed != null && dismissed.equals(version.trim().removePrefix("v"), ignoreCase = true)
+    }
+
+    /**
+     * Records that the user dismissed/snoozed an update prompt for this version.
+     */
+    fun markVersionDismissed(context: Context, version: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_DISMISSED_VERSION, version.trim().removePrefix("v")).apply()
+    }
+
+    /**
+     * Clears dismissed version state (e.g. when manually checking for updates).
+     */
+    fun clearDismissedVersion(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().remove(KEY_DISMISSED_VERSION).apply()
+    }
 
     /**
      * Checks GitHub Releases for a newer version than currentVersion.
@@ -85,7 +128,7 @@ object UpdateChecker {
             val isNewer = isNewerVersion(tagName, currentVersion)
 
             AppUpdateInfo(
-                latestVersion = tagName.removePrefix("v"),
+                latestVersion = tagName.trim().removePrefix("v"),
                 releaseTitle = releaseTitle,
                 releaseNotes = releaseNotes,
                 downloadUrl = apkUrl,
@@ -101,13 +144,17 @@ object UpdateChecker {
 
     /**
      * Compares semantic version strings e.g. "2.6.2" vs "2.6.1".
+     * Returns true ONLY if remoteTag represents a strictly higher version than currentVersion.
      */
     fun isNewerVersion(remoteTag: String, currentVersion: String): Boolean {
-        val remoteClean = remoteTag.removePrefix("v").trim()
-        val currentClean = currentVersion.removePrefix("v").trim()
+        val remoteClean = remoteTag.trim().trimStart { !it.isDigit() }
+        val currentClean = currentVersion.trim().trimStart { !it.isDigit() }
 
-        val remoteParts = remoteClean.split(".").mapNotNull { it.toIntOrNull() }
-        val currentParts = currentClean.split(".").mapNotNull { it.toIntOrNull() }
+        if (remoteClean.isBlank() || currentClean.isBlank()) return false
+        if (remoteClean == currentClean) return false
+
+        val remoteParts = remoteClean.split(Regex("[^0-9]+")).filter { it.isNotBlank() }.mapNotNull { it.toIntOrNull() }
+        val currentParts = currentClean.split(Regex("[^0-9]+")).filter { it.isNotBlank() }.mapNotNull { it.toIntOrNull() }
 
         for (i in 0 until maxOf(remoteParts.size, currentParts.size)) {
             val r = remoteParts.getOrElse(i) { 0 }
@@ -119,73 +166,105 @@ object UpdateChecker {
     }
 
     /**
-     * Starts downloading the APK via Android DownloadManager and triggers package install upon completion.
+     * Directly downloads the APK using HttpURLConnection into the app's cache dir
+     * and launches the system package installer.
+     * Bypasses DownloadManager and Android 14 BroadcastReceiver restrictions entirely.
      */
-    fun startDownloadAndInstall(context: Context, apkUrl: String, version: String) {
-        // 1. Verify unknown sources permission on Android 8+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!context.packageManager.canRequestPackageInstalls()) {
-                Toast.makeText(context, "Please allow SpendTracker to install updates", Toast.LENGTH_LONG).show()
-                val permissionIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                    data = Uri.parse("package:${context.packageName}")
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                context.startActivity(permissionIntent)
-                return
-            }
-        }
-
-        val fileName = "SpendTracker-v$version.apk"
-        val destinationFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
-        if (destinationFile.exists()) {
-            destinationFile.delete()
-        }
-
-        val request = DownloadManager.Request(Uri.parse(apkUrl)).apply {
-            setTitle("SpendTracker v$version")
-            setDescription("Downloading update...")
-            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            setMimeType("application/vnd.android.package-archive")
-            setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
-        }
-
-        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
-        if (downloadManager == null) {
-            Toast.makeText(context, "DownloadManager unavailable", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val downloadId = downloadManager.enqueue(request)
-        Toast.makeText(context, "Downloading SpendTracker v$version...", Toast.LENGTH_SHORT).show()
-
-        // Register receiver for when download finishes
-        val onComplete = object : BroadcastReceiver() {
-            override fun onReceive(recvContext: Context, intent: Intent) {
-                val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
-                if (id == downloadId) {
-                    try {
-                        recvContext.unregisterReceiver(this)
-                    } catch (_: Exception) {}
-
-                    installApk(recvContext, destinationFile)
+    suspend fun downloadAndInstall(
+        context: Context,
+        apkUrl: String,
+        version: String,
+        onProgress: (Int) -> Unit = {}
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            // Check unknown sources permission on Android 8+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!context.packageManager.canRequestPackageInstalls()) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Please allow SpendTracker to install apps", Toast.LENGTH_LONG).show()
+                        val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(intent)
+                    }
+                    return@withContext Result.failure(IllegalStateException("Install permission required"))
                 }
             }
-        }
 
-        ContextCompat.registerReceiver(
-            context,
-            onComplete,
-            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
+            val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
+            // Clean up any old downloaded update files
+            updatesDir.listFiles()?.forEach { if (it.isFile) it.delete() }
+
+            val targetFile = File(updatesDir, "SpendTracker-v$version.apk")
+
+            val url = URL(apkUrl)
+            val connection = (url.openConnection() as HttpURLConnection).apply {
+                instanceFollowRedirects = true
+                connectTimeout = 15000
+                readTimeout = 30000
+                setRequestProperty("User-Agent", "SpendTracker-Android")
+            }
+
+            // Handle HTTP 302/301 redirects if needed
+            val responseCode = connection.responseCode
+            val finalConnection = if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
+                responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
+                responseCode == HttpURLConnection.HTTP_SEE_OTHER
+            ) {
+                val redirectUrl = connection.getHeaderField("Location")
+                connection.disconnect()
+                (URL(redirectUrl).openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = true
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    setRequestProperty("User-Agent", "SpendTracker-Android")
+                }
+            } else {
+                connection
+            }
+
+            val totalBytes = finalConnection.contentLengthLong
+            var downloadedBytes = 0L
+
+            finalConnection.inputStream.use { input ->
+                FileOutputStream(targetFile).use { output ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                        downloadedBytes += bytesRead
+                        if (totalBytes > 0) {
+                            val progress = ((downloadedBytes * 100) / totalBytes).toInt().coerceIn(0, 100)
+                            withContext(Dispatchers.Main) {
+                                onProgress(progress)
+                            }
+                        }
+                    }
+                    output.flush()
+                }
+            }
+            finalConnection.disconnect()
+
+            if (!targetFile.exists() || targetFile.length() == 0L) {
+                return@withContext Result.failure(IllegalStateException("Downloaded file is empty"))
+            }
+
+            // Launch system package installer
+            withContext(Dispatchers.Main) {
+                installApk(context, targetFile)
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Download and install failed", e)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Update download failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            Result.failure(e)
+        }
     }
 
     private fun installApk(context: Context, apkFile: File) {
-        if (!apkFile.exists()) {
-            Toast.makeText(context, "Download file not found", Toast.LENGTH_SHORT).show()
-            return
-        }
-
         try {
             val contentUri = FileProvider.getUriForFile(
                 context,

@@ -45,11 +45,8 @@ if ($BumpPatch) {
     Write-Host "[i] Current Version: $vName (versionCode: $vCode)" -ForegroundColor Yellow
 }
 
-# Save version back to properties
-@"
-versionCode=$vCode
-versionName=$vName
-"@ | Out-File -FilePath $versionPropsPath -Encoding utf8
+# Save version back to properties (UTF-8 without BOM)
+[System.IO.File]::WriteAllText($versionPropsPath, "versionCode=$vCode`nversionName=$vName`n", (New-Object System.Text.UTF8Encoding($false)))
 
 # 2. Build APK
 Write-Host "`n[+] Compiling and building optimized release APK..." -ForegroundColor Cyan

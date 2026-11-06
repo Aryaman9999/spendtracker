@@ -15,10 +15,16 @@ android {
     val versionPropsFile = file("version.properties")
     val versionProps = Properties()
     if (versionPropsFile.exists()) {
-        versionProps.load(FileInputStream(versionPropsFile))
+        versionPropsFile.reader(Charsets.UTF_8).use { reader ->
+            versionProps.load(reader)
+        }
     }
-    val appVersionCode = (versionProps["versionCode"] as? String)?.toIntOrNull() ?: 2
-    val appVersionName = (versionProps["versionName"] as? String) ?: "1.2.0"
+    fun getProp(key: String): String? {
+        return versionProps.getProperty(key)
+            ?: versionProps.entries.firstOrNull { it.key.toString().trim().endsWith(key) }?.value?.toString()
+    }
+    val appVersionCode = getProp("versionCode")?.trim()?.toIntOrNull() ?: 2
+    val appVersionName = getProp("versionName")?.trim() ?: "1.2.0"
 
     defaultConfig {
         applicationId = "com.aryaman.spendtracker"
